@@ -9,6 +9,7 @@ import           Data.ByteString.Builder    (toLazyByteString)
 import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.IORef                 (modifyIORef', newIORef, readIORef)
+import           Data.List                  (find)
 
 import qualified Data.Text.Encoding         as TE
 import qualified Network.HTTP.Client        as HC
@@ -40,22 +41,36 @@ server = do
     Right cas -> Warp.runSettings (warpSettings settings) $ middle filePath cas $ HProxy.httpProxyApp settings mgr
   where
     filePath = "cassette.yaml"
-    settings = HProxy.defaultProxySettings { HProxy.proxyPort = 3128, HProxy.proxyRequestModifier = handler }
+    settings = HProxy.defaultProxySettings { HProxy.proxyPort = 3128 }
 
-handler :: HProxy.Request -> IO (Either Wai.Response HProxy.Request)
-handler req = pure $ Right req
 
 
 middle :: FilePath -> Cassette -> Wai.Middleware
-middle filePath cassette app req respond =  app req $ \response -> do
+middle filePath cassette app req respond =  do
+  let
+    acs = (apiCalls cassette)
   savedRequest  <- buildRequest req
   putStrLn $ show savedRequest
-  (status, headers, reBody) <- responseBody response
-  savedResponse <- buildResponse reBody response
-  putStrLn $ show savedResponse
-  saveApiCalls filePath $
-    (apiCalls cassette) <> [ApiCall { request = savedRequest, response = savedResponse }]
-  respond $ Wai.responseLBS status headers reBody
+  case find (\c -> request c == savedRequest) acs of
+    Just c ->
+      let
+        res = (response c)
+      in do
+        putStrLn "Recorded call!"
+        respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (body (res :: SavedResponse))
+    Nothing -> do
+      app req $ \response -> do
+        putStrLn "Proxied call!"
+        (status, headers, reBody) <- responseBody response
+        savedResponse <- buildResponse reBody response
+        putStrLn $ show savedResponse
+        saveApiCalls filePath $
+          acs <> [ApiCall { request = savedRequest, response = savedResponse }]
+        respond $ Wai.responseLBS status headers reBody
+
+
+
+
 
 warpSettings :: HProxy.Settings -> Warp.Settings
 warpSettings pset = Warp.setPort (HProxy.proxyPort pset)
