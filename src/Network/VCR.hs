@@ -29,20 +29,36 @@ import           Network.VCR.Types          (ApiCall (..), Cassette (..),
 
 import           Data.Yaml                  (decodeFileEither, encodeFile)
 
+import           System.Environment         (getArgs)
+import qualified System.Exit                as XIO
+import           System.IO                  (stderr)
+import qualified System.IO                  (hPutStrLn)
+
+
+die :: String -> IO a
+die err = (System.IO.hPutStrLn stderr err) >> XIO.exitFailure
 
 
 server :: IO ()
 server = do
+  args <- getArgs
+  case args of
+    [filePath, port] -> run filePath $ read port
+    [filePath]       -> run filePath 3128
+    _                -> die $ "Please provide the path to the cassette yaml file"
+
+
+
+run :: FilePath -> Int -> IO ()
+run filePath port = do
   mgr <- HC.newManager HC.tlsManagerSettings
   cassette <- decodeFileEither filePath
-
   case cassette of
-    Left err  -> error $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
+    Left err  -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
     Right cas -> Warp.runSettings (warpSettings settings) $ middle filePath cas $ HProxy.httpProxyApp settings mgr
-  where
-    filePath = "cassette.yaml"
-    settings = HProxy.defaultProxySettings { HProxy.proxyPort = 3128 }
 
+  where
+    settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
 
 
 middle :: FilePath -> Cassette -> Wai.Middleware
