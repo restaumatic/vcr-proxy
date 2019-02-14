@@ -9,6 +9,10 @@ copyright:           "2019 Author name here"
 extra-source-files:
 - README.md
 - ChangeLog.md
+default-extensions:
+- DuplicateRecordFields
+- OverloadedStrings
+- NamedFieldPuns
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package

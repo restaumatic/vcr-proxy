@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
 module Network.VCR.Types where
 
 import qualified Data.ByteString         as B
@@ -21,7 +18,6 @@ import           GHC.Generics            (Generic)
 import           Network.HTTP.Types      (Header, Query, Status (..))
 
 
-
 data SavedRequest = SavedRequest
   { methodName :: Text
   , headers    :: [Header]
@@ -36,8 +32,16 @@ data ApiCall = ApiCall
   , response :: SavedResponse
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
-data Cassette = Cassette { apiCalls :: [ApiCall] }
-  deriving (Show, Eq, Generic, ToJSON, FromJSON)
+data Cassette = Cassette
+  { apiCalls       :: [ApiCall]
+  , ignoredHeaders :: [Text]
+  } deriving (Show, Eq, Generic, ToJSON, FromJSON)
+
+instance Semigroup Cassette where
+  Cassette a h <> Cassette a' h' = Cassette (a <> a') (h <> h')
+
+instance Monoid Cassette where
+  mempty = Cassette [] []
 
 instance ToJSON SavedRequest where
   toJSON (SavedRequest{ methodName, headers, url, params , body}) =
@@ -57,7 +61,7 @@ instance FromJSON SavedRequest where
       v .: "url"    <*>
       ((\params -> toQuery <$> params) <$> v .: "params" ) <*>
       (BE.encodeUtf8 <$> v .: "body")
-  parseJSON _ = mzero
+  parseJSON _          = mzero
 
 data SavedResponse = SavedResponse
   { body    :: L.ByteString
@@ -68,25 +72,24 @@ data SavedResponse = SavedResponse
 instance ToJSON SavedResponse where
   toJSON (SavedResponse { body, headers, status }) =
     object
-      [ "body" .= (BEL.decodeUtf8 body)
-      , "headers" .= toJSON (fromHeader <$> headers)
-      , "status" .= object
-        [ "code" .= statusCode status
-        , "message" .= BE.decodeUtf8 (statusMessage status)
+      [ "body"     .= (BEL.decodeUtf8 body)
+      , "headers"  .= toJSON (fromHeader <$> headers)
+      , "status"   .= object
+        [ "code"   .= statusCode status
+        , "message".= BE.decodeUtf8 (statusMessage status)
         ]
       ]
 
 instance FromJSON SavedResponse where
-  parseJSON (Object v) =
+  parseJSON (Object v)         =
     SavedResponse <$>
       (BEL.encodeUtf8 <$> v .: "body") <*>
       ((\headers -> toHeader <$> headers) <$> (v .: "headers")) <*>
-      ( v.: "status" >>= parseStatus)
+      ( v.: "status"         >>= parseStatus)
     where
-      parseStatus (Object s) = Status <$> (s .: "code") <*> (BE.encodeUtf8 <$> s .: "message")
-      parseStatus _ = mzero
-
-  parseJSON _ = mzero
+      parseStatus (Object s)   = Status <$> (s .: "code") <*> (BE.encodeUtf8 <$> s .: "message")
+      parseStatus _            = mzero
+  parseJSON _                  = mzero
 
 fromQuery :: (B.ByteString, Maybe B.ByteString) -> (Text, Maybe Text)
 fromQuery (name, value) = (BE.decodeUtf8 name, BE.decodeUtf8 <$> value)
