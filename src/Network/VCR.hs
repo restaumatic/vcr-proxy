@@ -18,6 +18,7 @@ import qualified Network.Wai.Handler.Warp   as Warp
 
 
 import           Network.VCR.Middleware     (die, middleware)
+import           Network.VCR.Types          (Mode)
 import           System.Environment         (getArgs)
 
 
@@ -25,15 +26,15 @@ server :: IO ()
 server = do
   args <- getArgs
   case args of
-    [filePath, port] -> run filePath $ read port
-    [filePath]       -> run filePath 3128
-    _                -> die $ "Please provide the path to the cassette yaml file"
+    [mode, filePath, port] -> run (read mode) filePath (read port)
+    [mode, filePath]       -> run (read mode) filePath 3128
+    _                      -> die $ "Call with: `vcr-proxy mode path port` where mode is Replay | Record, path is the path to the cassette.yaml file"
 
 
-run :: FilePath -> Int -> IO ()
-run filePath port = do
+run :: Mode -> FilePath -> Int -> IO ()
+run mode filePath port = do
   mgr <- HC.newManager HC.tlsManagerSettings
-  Warp.runSettings (warpSettings settings) $ middleware filePath $ HProxy.httpProxyApp settings mgr
+  Warp.runSettings (warpSettings settings) $ middleware mode filePath $ HProxy.httpProxyApp settings mgr
     where
       settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
 

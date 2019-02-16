@@ -32,6 +32,7 @@ dependencies:
 - bytestring
 - bytestring-builder
 - text
+- directory
 - case-insensitive
 - warp
 - wai

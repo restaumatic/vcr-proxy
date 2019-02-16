@@ -18,6 +18,10 @@ import           GHC.Generics            (Generic)
 import           Network.HTTP.Types      (Header, Query, Status (..))
 
 
+data Mode = Record | Replay
+  deriving (Show, Eq, Read)
+
+
 data SavedRequest = SavedRequest
   { methodName :: Text
   , headers    :: [Header]
@@ -98,4 +102,7 @@ fromHeader (name, value) = (BE.decodeUtf8 $ foldedCase name, BE.decodeUtf8 value
 toHeader :: (Text, Text) -> Header
 toHeader (name, value)  =  (mk $ BE.encodeUtf8 name, BE.encodeUtf8 value)
 
+
+emptyCassette :: Cassette
+emptyCassette = Cassette { apiCalls = [], ignoredHeaders = [] }
 

@@ -7,27 +7,55 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.IORef                 (modifyIORef', newIORef, readIORef)
 import           Data.List                  (find)
 import           Data.Text                  (Text)
+import qualified Data.Text                  as T
 
 import qualified Data.Text.Encoding         as TE
 
 import           Data.Yaml                  (decodeFileEither, encodeFile)
 import qualified Network.HTTP.Types         as HT
 import           Network.VCR.Types          (ApiCall (..), Cassette (..),
-                                             SavedRequest (..),
-                                             SavedResponse (..))
+                                             Mode (..), SavedRequest (..),
+                                             SavedResponse (..), emptyCassette)
 import qualified Network.Wai                as Wai
 
 import           Data.CaseInsensitive       (mk)
 import qualified Data.Text.Encoding         as BE (encodeUtf8)
 
+import           System.Directory           (doesFileExist)
 import qualified System.Exit                as XIO
 import           System.IO                  (stderr)
 import qualified System.IO                  (hPutStrLn)
 
 
+middleware :: Mode -> FilePath -> Wai.Middleware
+middleware Replay = replayingMiddleware
+middleware Record = recordingMiddleware
 
-middleware :: FilePath -> Wai.Middleware
-middleware filePath app req respond = do
+
+recordingMiddleware :: FilePath -> Wai.Middleware
+recordingMiddleware filePath app req respond = do
+  exists <- doesFileExist filePath
+  if not exists then
+    encodeFile filePath emptyCassette
+    else
+      pure ()
+  cas <- decodeFileEither filePath
+  -- create file if it doesn't exist
+  case cas of
+    Left  err -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
+    Right cassette@Cassette { apiCalls, ignoredHeaders } ->
+      app req $ \response -> do
+        savedRequest <- buildRequest ignoredHeaders req
+        -- Since reading the response body consumes it, we can't just reuse the response
+        (status, headers, reBody) <- responseBody response
+        savedResponse <- buildResponse reBody response
+        encodeFile filePath $ cassette
+          { apiCalls = apiCalls <> [ApiCall { request = savedRequest, response = savedResponse }] }
+        respond $ Wai.responseLBS status headers reBody
+
+
+replayingMiddleware :: FilePath -> Wai.Middleware
+replayingMiddleware filePath app req respond = do
   cas <- decodeFileEither filePath
   case cas of
     Left  err -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
@@ -40,14 +68,9 @@ middleware filePath app req respond = do
           in
             respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (body (res :: SavedResponse))
         Nothing -> do
-          app req $ \response -> do
-            -- Since reading the response body consumes it, we can't just reuse the response
-            (status, headers, reBody) <- responseBody response
-            savedResponse <- buildResponse reBody response
-            encodeFile filePath $ cassette
-              { apiCalls = apiCalls <> [ApiCall { request = savedRequest, response = savedResponse }] }
-            respond $ Wai.responseLBS status headers reBody
-
+          respond $ Wai.responseLBS HT.status500
+              { HT.statusMessage =
+                  TE.encodeUtf8 . T.pack $ "The request: " <> show savedRequest  <> " is not recorded!" } [] ""
 
 
 buildRequest :: [Text] -> Wai.Request -> IO SavedRequest

@@ -1,9 +1,106 @@
-ignoredHeaders:
-  - x-via-proxy
-  - expires
-  - p3p
-  - set-cookie
-  - x-request-id
-  - x-runtime
-  - date
-apiCalls: []
+ignoredHeaders: []
+apiCalls:
+- response:
+    status:
+      code: 503
+      message: Service Unavailable
+    body: |2
+
+      <html><head>
+      <meta http-equiv="content-type" content="text/html;charset=utf-8">
+      <title>503 Over Quota</title>
+      <style><!--
+      body {font-family: arial,sans-serif}
+      div.nav {margin-top: 1ex}
+      div.nav A {font-size: 10pt; font-family: arial,sans-serif}
+      span.nav {font-size: 10pt; font-family: arial,sans-serif; font-weight: bold}
+      div.nav A,span.big {font-size: 12pt; color: #0000cc}
+      div.nav A {font-size: 10pt; color: black}
+      A.l:link {color: #6f6f6f}
+      A.u:link {color: green}
+      //--></style>
+
+      </head>
+      <body text=#000000 bgcolor=#ffffff>
+      <table border=0 cellpadding=2 cellspacing=0 width=100%>
+      <tr><td bgcolor=#3366cc><font face=arial,sans-serif color=#ffffff><b>Error</b></td></tr>
+      <tr><td>&nbsp;</td></tr></table>
+      <blockquote>
+      <H1>Over Quota</H1>
+      This application is temporarily over its serving quota.  Please try again later.
+
+      <p>
+      </blockquote>
+      <table width=100% cellpadding=0 cellspacing=0><tr><td bgcolor=#3366cc><img alt="" width=1 height=4></td></tr></table>
+      </body></html>
+    headers:
+    - - x-via-proxy
+      - 'yes'
+    - - x-cloud-trace-context
+      - 3a605e3ee58af59602ed169edf1a7f08
+    - - date
+      - Sat, 16 Feb 2019 19:16:59 GMT
+    - - content-type
+      - text/html
+    - - server
+      - Google Frontend
+    - - content-length
+      - '970'
+  request:
+    methodName: GET
+    body: ''
+    url: http://ip.jsontest.com/
+    params: []
+    headers: []
+- response:
+    status:
+      code: 503
+      message: Service Unavailable
+    body: |2
+
+      <html><head>
+      <meta http-equiv="content-type" content="text/html;charset=utf-8">
+      <title>503 Over Quota</title>
+      <style><!--
+      body {font-family: arial,sans-serif}
+      div.nav {margin-top: 1ex}
+      div.nav A {font-size: 10pt; font-family: arial,sans-serif}
+      span.nav {font-size: 10pt; font-family: arial,sans-serif; font-weight: bold}
+      div.nav A,span.big {font-size: 12pt; color: #0000cc}
+      div.nav A {font-size: 10pt; color: black}
+      A.l:link {color: #6f6f6f}
+      A.u:link {color: green}
+      //--></style>
+
+      </head>
+      <body text=#000000 bgcolor=#ffffff>
+      <table border=0 cellpadding=2 cellspacing=0 width=100%>
+      <tr><td bgcolor=#3366cc><font face=arial,sans-serif color=#ffffff><b>Error</b></td></tr>
+      <tr><td>&nbsp;</td></tr></table>
+      <blockquote>
+      <H1>Over Quota</H1>
+      This application is temporarily over its serving quota.  Please try again later.
+
+      <p>
+      </blockquote>
+      <table width=100% cellpadding=0 cellspacing=0><tr><td bgcolor=#3366cc><img alt="" width=1 height=4></td></tr></table>
+      </body></html>
+    headers:
+    - - x-via-proxy
+      - 'yes'
+    - - x-cloud-trace-context
+      - 49c173273ee0360cfb4a3a0ca7f2486c
+    - - date
+      - Sat, 16 Feb 2019 19:17:36 GMT
+    - - content-type
+      - text/html
+    - - server
+      - Google Frontend
+    - - content-length
+      - '970'
+  request:
+    methodName: GET
+    body: ''
+    url: http://date.jsontest.com/
+    params: []
+    headers: []
