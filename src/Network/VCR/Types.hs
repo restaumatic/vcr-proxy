@@ -37,11 +37,6 @@ data Cassette = Cassette
   , ignoredHeaders :: [Text]
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
-instance Semigroup Cassette where
-  Cassette a h <> Cassette a' h' = Cassette (a <> a') (h <> h')
-
-instance Monoid Cassette where
-  mempty = Cassette [] []
 
 instance ToJSON SavedRequest where
   toJSON (SavedRequest{ methodName, headers, url, params , body}) =

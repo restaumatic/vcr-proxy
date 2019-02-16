@@ -16,13 +16,9 @@ import qualified Network.Wai                as Wai
 import qualified Network.Wai.Handler.Warp   as Warp
 
 
-import           Data.Yaml                  (decodeFileEither)
 
-import           Network.VCR.Middleware     (middleware)
+import           Network.VCR.Middleware     (die, middleware)
 import           System.Environment         (getArgs)
-import qualified System.Exit                as XIO
-import           System.IO                  (stderr)
-import qualified System.IO                  (hPutStrLn)
 
 
 server :: IO ()
@@ -37,13 +33,9 @@ server = do
 run :: FilePath -> Int -> IO ()
 run filePath port = do
   mgr <- HC.newManager HC.tlsManagerSettings
-  cassette <- decodeFileEither filePath
-  case cassette of
-    Left err  -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
-    Right cas -> Warp.runSettings (warpSettings settings) $ middleware filePath cas $ HProxy.httpProxyApp settings mgr
-
-  where
-    settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
+  Warp.runSettings (warpSettings settings) $ middleware filePath $ HProxy.httpProxyApp settings mgr
+    where
+      settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
 
 
 warpSettings :: HProxy.Settings -> Warp.Settings
@@ -61,5 +53,3 @@ defaultExceptionResponse e =
                 $ LBS.fromChunks [BS.pack $ show e]
 
 
-die :: String -> IO a
-die err = (System.IO.hPutStrLn stderr err) >> XIO.exitFailure
