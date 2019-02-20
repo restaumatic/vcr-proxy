@@ -1,0 +1,36 @@
+ignoredHeaders: []
+apiCalls:
+- response:
+    status:
+      code: 200
+      message: OK
+    body: ! '{"args":{},"data":"","files":{},"form":{"RETURN THIS":""},"headers":{"x-forwarded-proto":"https","host":"postman-echo.com","content-length":"11","accept":"*/*","accept-encoding":"gzip","content-type":"application/x-www-form-urlencoded","user-agent":"curl/7.54.0","x-forwarded-port":"443"},"json":{"RETURN
+      THIS":""},"url":"https://postman-echo.com/post"}'
+    headers:
+    - - x-via-proxy
+      - 'yes'
+    - - content-encoding
+      - gzip
+    - - content-type
+      - application/json; charset=utf-8
+    - - date
+      - Wed, 20 Feb 2019 12:46:04 GMT
+    - - etag
+      - W/"161-/+7sogff3HHwvNZ0N6/PEIi992Y"
+    - - server
+      - nginx
+    - - set-cookie
+      - sails.sid=s%3AZ8Er_mJ6ZdZGpprlP86lQ6gzxEK6K881.WOKz1JtNAc9jfzuTdaIy4jo6vCrLT0dQCY9ykUdG%2FEU;
+        Path=/; HttpOnly
+    - - vary
+      - Accept-Encoding
+    - - content-length
+      - '237'
+    - - connection
+      - keep-alive
+  request:
+    methodName: POST
+    body: RETURN THIS
+    url: /post
+    params: []
+    headers: []
