@@ -26,15 +26,15 @@ server :: IO ()
 server = do
   args <- getArgs
   case args of
-    [mode, filePath, port] -> run (read mode) filePath (read port)
-    [mode, filePath]       -> run (read mode) filePath 3128
-    _                      -> die $ "Call with: `vcr-proxy mode path port` where mode is Replay | Record, path is the path to the cassette.yaml file"
+    [mode, endpoint, filePath, port] -> run (read mode) endpoint filePath (read port)
+    [mode, endpoint, filePath]       -> run (read mode) endpoint filePath 3128
+    _                                -> die $ "Call with: `vcr-proxy mode endpoint path port` where mode is Replay | Record, path is the path to the cassette yaml file"
 
 
-run :: Mode -> FilePath -> Int -> IO ()
-run mode filePath port = do
+run :: Mode -> String -> FilePath -> Int -> IO ()
+run mode endpoint filePath port = do
   mgr <- HC.newManager HC.tlsManagerSettings
-  Warp.runSettings (warpSettings settings) $ middleware mode filePath $ HProxy.httpProxyApp settings mgr
+  Warp.runSettings (warpSettings settings) $ middleware mode endpoint filePath $ HProxy.httpProxyApp settings mgr
     where
       settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
 

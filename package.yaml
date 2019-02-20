@@ -38,6 +38,7 @@ dependencies:
 - wai
 - aeson
 - yaml
+- uri-bytestring
 
 
 library:
