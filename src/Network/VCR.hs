@@ -46,7 +46,6 @@ warpSettings :: HProxy.Settings -> Warp.Settings
 warpSettings pset = Warp.setPort (HProxy.proxyPort pset)
     . Warp.setHost (HProxy.proxyHost pset)
     . Warp.setTimeout (HProxy.proxyTimeout pset)
-    . Warp.setOnException (\ _ _ -> return ())
     . Warp.setOnExceptionResponse defaultExceptionResponse
     $ Warp.setNoParsePath True Warp.defaultSettings
 

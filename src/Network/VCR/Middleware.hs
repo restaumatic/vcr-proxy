@@ -99,12 +99,12 @@ modifyEndpoint endpoint req = req
     endpoint'                   = TE.encodeUtf8 endpoint
     uri                         = either endpointError id $ URI.parseURI URI.strictURIParserOptions endpoint'
     host                        = maybe noHostError (URI.hostBS . URI.authorityHost) (URI.uriAuthority uri)
-    scheme                      = TE.decodeUtf8 . URI.schemeBS . URI.uriScheme $ uri
+    scheme                      = URI.schemeBS . URI.uriScheme $ uri
     modifyHeader h@(key, value) = if key == hostHeaderKey then (key, host) else h
-    modifyPath                  = TE.encodeUtf8 . T.append scheme . T.append "://" . T.append (TE.decodeUtf8 host) . TE.decodeUtf8
+    modifyPath                  = BS.append scheme . BS.append "://" . BS.append host
     endpointError e             = error $ "Error parsing endpoint as URI, " <> show e
     noHostError                 = error "No host could be extracted from the endpoint"
-    hostHeaderKey               = (mk . TE.encodeUtf8 $ "Host")
+    hostHeaderKey               = (mk "Host")
 
 buildRequest :: [Text] -> Wai.Request -> LBS.ByteString -> SavedRequest
 buildRequest ignoredHeaders r body =
