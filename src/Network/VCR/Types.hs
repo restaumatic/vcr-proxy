@@ -64,7 +64,8 @@ data ApiCall = ApiCall
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
 data Cassette = Cassette
-  { apiCalls       :: [ApiCall]
+  { endpoint       :: Text
+  , apiCalls       :: [ApiCall]
   , ignoredHeaders :: [Text]
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
@@ -130,6 +131,6 @@ toHeader :: (Text, Text) -> Header
 toHeader (name, value)  =  (mk $ BE.encodeUtf8 name, BE.encodeUtf8 value)
 
 
-emptyCassette :: Cassette
-emptyCassette = Cassette { apiCalls = [], ignoredHeaders = [] }
+emptyCassette :: Text -> Cassette
+emptyCassette endpoint = Cassette { endpoint = endpoint, apiCalls = [], ignoredHeaders = [] }
 

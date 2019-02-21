@@ -14,13 +14,13 @@ apiCalls:
     - - content-type
       - application/json; charset=utf-8
     - - date
-      - Wed, 20 Feb 2019 12:46:04 GMT
+      - Thu, 21 Feb 2019 11:47:44 GMT
     - - etag
       - W/"161-/+7sogff3HHwvNZ0N6/PEIi992Y"
     - - server
       - nginx
     - - set-cookie
-      - sails.sid=s%3AZ8Er_mJ6ZdZGpprlP86lQ6gzxEK6K881.WOKz1JtNAc9jfzuTdaIy4jo6vCrLT0dQCY9ykUdG%2FEU;
+      - sails.sid=s%3Av2toBEyqrHTs6y4fa95hiH5ia7zbI64k.4HjVmZnPpFZ51NPEfx6KAQ%2FAdpl2WUKA552XG3bUZAA;
         Path=/; HttpOnly
     - - vary
       - Accept-Encoding
@@ -34,3 +34,4 @@ apiCalls:
     url: /post
     params: []
     headers: []
+endpoint: https://postman-echo.com/

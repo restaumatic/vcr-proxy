@@ -40,7 +40,7 @@ middleware Record { endpoint } = recordingMiddleware endpoint
 recordingMiddleware :: String -> FilePath -> Wai.Middleware
 recordingMiddleware endpoint filePath app req respond = do
   exists <- doesFileExist filePath
-  when (not exists) $ encodeFile filePath emptyCassette
+  when (not exists) $ encodeFile filePath (emptyCassette $ T.pack endpoint)
   cas <- decodeFileEither filePath
   (req', body) <- getRequestBody req
   -- Construct a request that can be sent to the actual remote API, by replacing the host in the request with the endpoint

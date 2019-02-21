@@ -52,7 +52,7 @@ warpSettings pset = Warp.setPort (HProxy.proxyPort pset)
 
 defaultExceptionResponse :: SomeException -> Wai.Response
 defaultExceptionResponse e =
-        Wai.responseLBS HT.internalServerError500
+        Wai.responseLBS HT.badGateway502
                 [ (HT.hContentType, "text/plain; charset=utf-8") ]
                 $ LBS.fromChunks [BS.pack $ show e]
 
