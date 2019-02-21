@@ -30,9 +30,9 @@ import           System.IO                  (stderr)
 import qualified System.IO                  (hPutStrLn)
 import qualified URI.ByteString             as URI
 
-middleware :: Mode -> String -> FilePath -> Wai.Middleware
-middleware Replay = replayingMiddleware
-middleware Record = recordingMiddleware
+middleware :: Mode -> FilePath -> Wai.Middleware
+middleware Replay              = replayingMiddleware
+middleware Record { endpoint } = recordingMiddleware endpoint
 
 
 -- | Middleware which only records API calls, the requests are proxied to the `endpoint` and recorded in the
@@ -65,8 +65,8 @@ recordingMiddleware endpoint filePath app req respond = do
 
 -- | Middleware which only replays API calls, if a request is not found in the filePath provided cassette file,
 -- a 500 error will be thrown
-replayingMiddleware :: String -> FilePath -> Wai.Middleware
-replayingMiddleware _ filePath app req respond = do
+replayingMiddleware :: FilePath -> Wai.Middleware
+replayingMiddleware filePath app req respond = do
   cas <- decodeFileEither filePath
   case cas of
     Left  err -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)

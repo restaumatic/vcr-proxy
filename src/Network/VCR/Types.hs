@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Network.VCR.Types where
 
 import qualified Data.ByteString         as B
@@ -17,9 +18,35 @@ import           GHC.Generics            (Generic)
 
 import           Network.HTTP.Types      (Header, Query, Status (..))
 
+import           Control.Applicative     ((<|>))
+import           Data.Semigroup          ((<>))
+import           Options.Applicative     (Parser, auto, help, long, metavar,
+                                          option, short, showDefault, strOption,
+                                          value)
 
-data Mode = Record | Replay
-  deriving (Show, Eq, Read)
+
+data Mode = Record { endpoint :: String } | Replay
+  deriving (Show, Eq)
+
+parseRecordMode :: Parser Mode
+parseRecordMode = Record <$> strOption ( long "record" <> short 'r' <> metavar "REMOTE_API_ENDPOINT" <>
+  help "Run in record mode, and forward requests to the specified API endpoint")
+
+parseReplayMode :: Parser Mode
+parseReplayMode = pure Replay
+
+
+data Options = Options
+  { cassettePath :: FilePath
+  , mode         :: Mode
+  , port         :: Int
+  } deriving (Eq, Show)
+
+parseOptions :: Parser Options
+parseOptions = Options
+  <$> strOption (long "cassette" <> short 'c' <> metavar "CASSETTE_FILE" <> help "Cassette yaml file for recording/replaying the API interactions")
+  <*> (parseRecordMode <|> parseReplayMode)
+  <*> option auto (long "port" <> help "Port to listen on" <> showDefault <> value 3128 <> metavar "INT")
 
 
 data SavedRequest = SavedRequest

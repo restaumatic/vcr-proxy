@@ -39,6 +39,7 @@ dependencies:
 - aeson
 - yaml
 - uri-bytestring
+- optparse-applicative
 
 
 library:
