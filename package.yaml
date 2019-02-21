@@ -46,7 +46,7 @@ library:
   source-dirs: src
 
 executables:
-  vcr-proxy-exe:
+  vcr-proxy:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
