@@ -36,6 +36,7 @@ server = execParser opts >>= run
 
 run :: Options -> IO ()
 run Options { mode, cassettePath, port } = do
+  putStrLn $ "Starting VCR proxy, mode: " <> show mode  <> ", cassette file: " <> cassettePath <>  ", listening on port: " <> show port
   mgr <- HC.newManager HC.tlsManagerSettings
   Warp.runSettings (warpSettings settings) $ middleware mode cassettePath $ HProxy.httpProxyApp settings mgr
     where
