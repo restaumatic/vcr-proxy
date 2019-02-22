@@ -25,6 +25,9 @@ import           Options.Applicative        (execParser, fullDesc, header,
                                              helper, info, progDesc)
 import           System.Environment         (getArgs)
 
+import           System.IO                  (BufferMode (..), hSetBuffering,
+                                             stdout)
+
 
 server :: IO ()
 server = execParser opts >>= run
@@ -36,6 +39,8 @@ server = execParser opts >>= run
 
 run :: Options -> IO ()
 run Options { mode, cassettePath, port } = do
+  -- Set line buffering, because if we use it from a parent process, pipes are full buffered by default
+  hSetBuffering stdout LineBuffering
   putStrLn $ "Starting VCR proxy, mode: " <> show mode  <> ", cassette file: " <> cassettePath <>  ", listening on port: " <> show port
   mgr <- HC.newManager HC.tlsManagerSettings
   Warp.runSettings (warpSettings settings) $ middleware mode cassettePath $ HProxy.httpProxyApp settings mgr
@@ -43,11 +48,14 @@ run Options { mode, cassettePath, port } = do
       settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
 
 
+
 warpSettings :: HProxy.Settings -> Warp.Settings
 warpSettings pset = Warp.setPort (HProxy.proxyPort pset)
     . Warp.setHost (HProxy.proxyHost pset)
     . Warp.setTimeout (HProxy.proxyTimeout pset)
     . Warp.setOnExceptionResponse defaultExceptionResponse
+    -- This is needed so we know when we start using the proxy if it is run as a child process
+    . Warp.setBeforeMainLoop (putStrLn "VCR proxy started")
     $ Warp.setNoParsePath True Warp.defaultSettings
 
 defaultExceptionResponse :: SomeException -> Wai.Response
