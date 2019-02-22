@@ -4,12 +4,35 @@ VCR proxy can be used  to record and replay recorded API interactions.
 
 It is not a HTTP proxy in the normal sense, instead the HTTP client which we are testing should be pointed (if possible) at the proxy as its endpoint. VCR proxy in Record mode will use the "endpoint" argument to route the requests to the remote API.
 
+
+## Usage
+
+```
+% vcr-proxy --help
+VCR Proxy
+
+Usage: vcr-proxy (-c|--cassette CASSETTE_FILE) [-r|--record REMOTE_API_ENDPOINT]
+                 [--port INT]
+  Run the VCR proxy to replay or record API calls. Runs in replay mode by
+  default.
+
+Available options:
+  -c,--cassette CASSETTE_FILE
+                           Cassette yaml file for recording/replaying the API
+                           interactions
+  -r,--record REMOTE_API_ENDPOINT
+                           Run in record mode, and forward requests to the
+                           specified API endpoint
+  --port INT               Port to listen on (default: 3128)
+  -h,--help                Show this help text
+```
+
 ### Example usage
 
 1. Run vcr proxy in `Record` mode:
 
 ```
-vcr-proxy-exe "Record" "https://postman-echo.com/" "cassette.yaml" "3128"
+vcr-proxy -r "https://postman-echo.com/" -c cassette.yaml
 ```
 
 2. Interact with the "API"
@@ -62,7 +85,7 @@ apiCalls:
 4. Run the proxy in `Replay` mode
 
 ```
-vcr-proxy-exe "Replay" "https://postman-echo.com/" "cassette.yaml" "3128"
+vcr-proxy -c cassette.yaml
 ```
 
 5. Interact with the "API"
