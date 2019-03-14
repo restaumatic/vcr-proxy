@@ -23,6 +23,8 @@ import qualified Network.Wai.Internal       as Wai (getRequestBodyChunk)
 import           Data.CaseInsensitive       (mk)
 import qualified Data.Text.Encoding         as BE (encodeUtf8)
 
+import qualified Codec.Compression.GZip     as GZip
+import           Data.CaseInsensitive       (CI)
 import           Data.IORef                 (atomicModifyIORef)
 import           System.Directory           (doesFileExist)
 import qualified System.Exit                as XIO
@@ -60,7 +62,7 @@ recordingMiddleware endpoint filePath app req respond = do
         -- Store the request, response pair
         encodeFile filePath $ cassette
           { apiCalls = apiCalls <> [ApiCall { request = savedRequest, response = savedResponse }] }
-        respond $ Wai.responseLBS status headers reBody
+        respond $ Wai.responseLBS status headers (gzipIfNeeded headers reBody)
 
 
 -- | Middleware which only replays API calls, if a request is not found in the filePath provided cassette file,
@@ -79,8 +81,9 @@ replayingMiddleware filePath app req respond = do
         Just c ->
           let
             res = (response c)
+            gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (body (res :: SavedResponse))
           in
-            respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (body (res :: SavedResponse))
+            respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
         -- if the request was not recorded, return an error
         Nothing -> do
           respond $ Wai.responseLBS HT.status500
@@ -163,3 +166,14 @@ getRequestBody req = do
 
 die :: String -> IO a
 die err = (System.IO.hPutStrLn stderr err) >> XIO.exitFailure
+
+
+gzipIfNeeded :: [HT.Header] -> LBS.ByteString -> LBS.ByteString
+gzipIfNeeded headers body | needsCompression headers = GZip.compress body
+gzipIfNeeded _ body       = body
+
+needsCompression :: [HT.Header] -> Bool
+needsCompression headers =
+  case lookup ("Content-Encoding" :: CI BS.ByteString) headers of
+    Just "gzip" -> True
+    _           -> False

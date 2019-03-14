@@ -40,6 +40,7 @@ dependencies:
 - yaml
 - uri-bytestring
 - optparse-applicative
+- zlib
 
 library:
   source-dirs: src
