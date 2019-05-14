@@ -1,9 +1,13 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Network.VCR
     ( server
+    , withServer
     ) where
 
-import           Control.Exception          (SomeException)
+import           Control.Concurrent         (forkIO, killThread, threadDelay)
+import           Control.Concurrent.MVar    (newEmptyMVar, putMVar, takeMVar, MVar)
+import           Control.Exception          (SomeException, bracket)
+import           Control.Monad
 import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Network.HTTP.Client        as HC
@@ -15,7 +19,6 @@ import qualified Network.HTTP.Proxy         as HProxy (Request (..),
 import qualified Network.HTTP.Types         as HT
 import qualified Network.Wai                as Wai
 import qualified Network.Wai.Handler.Warp   as Warp
-
 
 
 import           Control.Applicative        ((<**>))
@@ -38,24 +41,39 @@ server = execParser opts >>= run
      <> header "VCR Proxy" )
 
 run :: Options -> IO ()
-run Options { mode, cassettePath, port } = do
+run options@Options { mode, cassettePath, port } = do
+  putStrLn $ "Starting VCR proxy, mode: " <> show mode  <> ", cassette file: " <> cassettePath <>  ", listening on port: " <> show port
+  withServer options $ do
+    putStrLn "VCR proxy started"
+    forever $ threadDelay 1000000000
+
+withServer :: Options -> IO a -> IO a
+withServer Options { mode, cassettePath, port } action = do
   -- Set line buffering, because if we use it from a parent process, pipes are full buffered by default
   hSetBuffering stdout LineBuffering
-  putStrLn $ "Starting VCR proxy, mode: " <> show mode  <> ", cassette file: " <> cassettePath <>  ", listening on port: " <> show port
-  mgr <- HC.newManager HC.tlsManagerSettings
-  Warp.runSettings (warpSettings settings) $ middleware mode cassettePath $ HProxy.httpProxyApp settings mgr
-    where
-      settings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
+  started <- newEmptyMVar
+  bracket (start started) killThread $ \_ -> do
+    takeMVar started
+    action
+
+  where
+    start started = forkIO $ do
+      mgr <- HC.newManager HC.tlsManagerSettings
+      Warp.runSettings (warpSettings started proxySettings) $ middleware mode cassettePath $ HProxy.httpProxyApp proxySettings mgr
+    proxySettings = HProxy.defaultProxySettings { HProxy.proxyPort = port }
 
 
 
-warpSettings :: HProxy.Settings -> Warp.Settings
-warpSettings pset = Warp.setPort (HProxy.proxyPort pset)
+warpSettings
+  :: MVar () -- ^ MVar to put after starting
+  -> HProxy.Settings
+  -> Warp.Settings
+warpSettings started pset = Warp.setPort (HProxy.proxyPort pset)
     . Warp.setHost (HProxy.proxyHost pset)
     . Warp.setTimeout (HProxy.proxyTimeout pset)
     . Warp.setOnExceptionResponse defaultExceptionResponse
     -- This is needed so we know when we start using the proxy if it is run as a child process
-    . Warp.setBeforeMainLoop (putStrLn "VCR proxy started")
+    . Warp.setBeforeMainLoop (putMVar started ())
     $ Warp.setNoParsePath True Warp.defaultSettings
 
 defaultExceptionResponse :: SomeException -> Wai.Response

@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric  #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 module Network.VCR.Types where
 
 import qualified Data.ByteString         as B
@@ -42,11 +44,14 @@ data Options = Options
   , port         :: Int
   } deriving (Eq, Show)
 
+pattern DEFAULT_PORT :: Int
+pattern DEFAULT_PORT = 3128
+
 parseOptions :: Parser Options
 parseOptions = Options
   <$> strOption (long "cassette" <> short 'c' <> metavar "CASSETTE_FILE" <> help "Cassette yaml file for recording/replaying the API interactions")
   <*> (parseRecordMode <|> parseReplayMode)
-  <*> option auto (long "port" <> help "Port to listen on" <> showDefault <> value 3128 <> metavar "INT")
+  <*> option auto (long "port" <> help "Port to listen on" <> showDefault <> value DEFAULT_PORT <> metavar "INT")
 
 
 data SavedRequest = SavedRequest
