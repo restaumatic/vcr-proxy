@@ -7,6 +7,7 @@ import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.IORef                 (modifyIORef', newIORef, readIORef)
 import           Data.List                  (find)
+import           Data.Maybe                 (mapMaybe)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 
@@ -96,17 +97,19 @@ modifyEndpoint :: Text -> Wai.Request -> Wai.Request
 modifyEndpoint endpoint req = req
   { Wai.requestHeaderHost = Just host
   , Wai.rawPathInfo       = modifyPath $ Wai.rawPathInfo req
-  , Wai.requestHeaders    = modifyHeader <$> (Wai.requestHeaders req)
+  , Wai.requestHeaders    = mapMaybe modifyHeader (Wai.requestHeaders req) <> [("accept-encoding", "identity")]
   } where
     endpoint'                   = TE.encodeUtf8 endpoint
     uri                         = either endpointError id $ URI.parseURI URI.strictURIParserOptions endpoint'
     host                        = maybe noHostError (URI.hostBS . URI.authorityHost) (URI.uriAuthority uri)
     scheme                      = URI.schemeBS . URI.uriScheme $ uri
-    modifyHeader h@(key, value) = if key == hostHeaderKey then (key, host) else h
+    modifyHeader h@(key, value)
+      | key == mk "host"             = Just (key, host) 
+      | key == mk "accept-encoding"  = Nothing
+      | otherwise                 = Just h
     modifyPath                  = BS.append scheme . BS.append "://" . BS.append host
     endpointError e             = error $ "Error parsing endpoint as URI, " <> show e
     noHostError                 = error "No host could be extracted from the endpoint"
-    hostHeaderKey               = (mk "Host")
 
 buildRequest :: [Text] -> Wai.Request -> LBS.ByteString -> SavedRequest
 buildRequest ignoredHeaders r body =
