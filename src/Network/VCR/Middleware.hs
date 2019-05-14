@@ -18,7 +18,6 @@ import           Network.VCR.Types          (ApiCall (..), Cassette (..),
                                              Mode (..), SavedRequest (..),
                                              SavedResponse (..), emptyCassette)
 import qualified Network.Wai                as Wai
-import qualified Network.Wai.Internal       as Wai (getRequestBodyChunk)
 
 import           Data.CaseInsensitive       (mk)
 import qualified Data.Text.Encoding         as BE (encodeUtf8)
@@ -145,10 +144,10 @@ getResponseBody res =
 getRequestBody :: Wai.Request -> IO (Wai.Request, [BS.ByteString])
 getRequestBody req = do
   let loop front = do
-         bs <- Wai.getRequestBodyChunk req
-         if BS.null bs
-             then return $ front []
-             else loop $ front . (bs:)
+        bs <- Wai.requestBody req
+        if BS.null bs
+            then return $ front []
+            else loop $ front . (bs:)
   body <- loop id
   -- Since reading the body consumes it, we need to refill it.
   -- This implementation ensures that each chunk is only returned
