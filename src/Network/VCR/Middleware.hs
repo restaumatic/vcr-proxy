@@ -13,7 +13,8 @@ import qualified Data.Text                  as T
 
 import qualified Data.Text.Encoding         as TE
 
-import           Data.Yaml                  (decodeFileEither, encodeFile)
+import           Data.Yaml                  (decodeFileEither, encode,
+                                             encodeFile)
 import qualified Network.HTTP.Types         as HT
 import           Network.VCR.Types          (ApiCall (..), Cassette (..),
                                              Mode (..), SavedRequest (..),
@@ -86,10 +87,9 @@ replayingMiddleware filePath app req respond = do
             respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
         -- if the request was not recorded, return an error
         Nothing -> do
-          respond $ Wai.responseLBS HT.status500
-              { HT.statusMessage =
-                  TE.encodeUtf8 . T.pack $
-                    "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders } [] ""
+          let msg = TE.encodeUtf8 . T.pack $
+                    "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders
+          respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
 
 
 -- | Modify parts of the request so that it can be sent to the remote API while being received on a localhost server
@@ -104,7 +104,7 @@ modifyEndpoint endpoint req = req
     host                        = maybe noHostError (URI.hostBS . URI.authorityHost) (URI.uriAuthority uri)
     scheme                      = URI.schemeBS . URI.uriScheme $ uri
     modifyHeader h@(key, value)
-      | key == mk "host"             = Just (key, host) 
+      | key == mk "host"             = Just (key, host)
       | key == mk "accept-encoding"  = Nothing
       | otherwise                 = Just h
     modifyPath                  = BS.append scheme . BS.append "://" . BS.append host
