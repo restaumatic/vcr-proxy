@@ -11,8 +11,8 @@ It is not a HTTP proxy in the normal sense, instead the HTTP client which we are
 % vcr-proxy --help
 VCR Proxy
 
-Usage: vcr-proxy (-c|--cassette CASSETTE_FILE) [-r|--record REMOTE_API_ENDPOINT]
-                 [--port INT]
+Usage: vcr-proxy (-c|--cassette CASSETTE_FILE) (-m|--mode MODE)
+                 (-e|--endpoint REMOTE_API_ENDPOINT) [--port INT]
   Run the VCR proxy to replay or record API calls. Runs in replay mode by
   default.
 
@@ -20,9 +20,10 @@ Available options:
   -c,--cassette CASSETTE_FILE
                            Cassette yaml file for recording/replaying the API
                            interactions
-  -r,--record REMOTE_API_ENDPOINT
-                           Run in record mode, and forward requests to the
-                           specified API endpoint
+  -m,--mode MODE           Run vcr proxy in the specified mode: Record | Replay
+                           | ReplayStrict
+  -e,--endpoint REMOTE_API_ENDPOINT
+                           Forward requests to the specified API endpoint
   --port INT               Port to listen on (default: 3128)
   -h,--help                Show this help text
 ```
@@ -32,7 +33,7 @@ Available options:
 1. Run vcr proxy in `Record` mode:
 
 ```
-vcr-proxy -r "https://postman-echo.com/" -c cassette.yaml
+vcr-proxy -e "https://postman-echo.com/" -c cassette.yaml -m Record
 ```
 
 2. Interact with the "API"
@@ -82,10 +83,10 @@ apiCalls:
     headers: []
 ```
 
-4. Run the proxy in `Replay` mode
+4. Run the proxy in `ReplayStrict` or `Replay` mode
 
 ```
-vcr-proxy -c cassette.yaml
+vcr-proxy -e "https://postman-echo.com/" -c cassette.yaml -m ReplayStrict
 ```
 
 5. Interact with the "API"
