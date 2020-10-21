@@ -1,4 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Network.VCR.Middleware where
 
 
@@ -35,8 +37,8 @@ import qualified System.IO                  (hPutStrLn)
 import qualified URI.ByteString             as URI
 
 middleware :: Mode -> IORef Cassette -> FilePath -> Wai.Middleware
-middleware Replay              = replayingMiddleware
-middleware ReplayStrict        = replayingStrictMiddleware
+middleware Replay              = replayingMiddleware findAnyResponse
+middleware ReplayStrict        = replayingMiddleware consumeRequestsInOrder
 middleware Record { endpoint } = recordingMiddleware endpoint
 
 
@@ -62,53 +64,49 @@ recordingMiddleware endpoint cassetteIORef filePath app req respond = do
     respond $ Wai.responseLBS status headers (gzipIfNeeded headers reBody)
 
 
+-- | A policy for obtaining responses given a request.
+type FindResponse = IORef Cassette -> SavedRequest -> IO (Either Text SavedResponse)
+
+findAnyResponse :: FindResponse
+findAnyResponse cassetteIORef savedRequest = do
+  Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
+  pure $
+    fmap response $
+    note ("The request: " <> tshow savedRequest <> " is not recorded! Ignored headers: " <> tshow ignoredHeaders) $
+    find (\c -> request c == savedRequest) apiCalls
+
+-- | A policy for obtaining response which expects the request to be issued in the order they were recorded.
+consumeRequestsInOrder :: FindResponse
+consumeRequestsInOrder cassetteIORef savedRequest = do
+  cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
+  case apiCalls of
+    c : rest -> do
+      if request c == savedRequest then do
+        writeIORef cassetteIORef $ cassette { apiCalls = rest }
+        pure $ Right $ response c
+      else
+        pure $ Left $ "Expected a different request: " <> tshow savedRequest
+    [] ->
+      pure $ Left "No more requests recorded!"
+
 -- | Middleware which only replays API calls, if a request is not found in the filePath provided cassette file,
 -- a 500 error will be thrown
-replayingMiddleware :: IORef Cassette -> FilePath -> Wai.Middleware
-replayingMiddleware cassetteIORef filePath app req respond= do
+replayingMiddleware :: FindResponse -> IORef Cassette -> FilePath -> Wai.Middleware
+replayingMiddleware findResponse cassetteIORef filePath app req respond = do
   cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
   b <- Wai.strictRequestBody req
   let savedRequest = buildRequest ignoredHeaders req b
-  -- Find an existing ApiCall with a simmilar request (up to ignored headers)
-  case find (\c -> request c == savedRequest) apiCalls of
+  -- Find an existing ApiCall according to the FindResponse policy
+  findResponse cassetteIORef savedRequest >>= \case
     -- if a request is found, respond with the saved response
-    Just c -> do
-        let
-          res = (response c)
-          gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (body (res :: SavedResponse))
-        respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
+    Right res -> do
+      let
+        gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (body (res :: SavedResponse))
+      respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
     -- if the request was not recorded, return an error
-    Nothing -> do
-      let msg = TE.encodeUtf8 . T.pack $
-                "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders
-      respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
-
-
--- | Requests must be matching and in order
-replayingStrictMiddleware :: IORef Cassette -> FilePath -> Wai.Middleware
-replayingStrictMiddleware cassetteIORef filePath app req respond= do
-  cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
-  b <- Wai.strictRequestBody req
-  let savedRequest = buildRequest ignoredHeaders req b
-  -- Find an existing ApiCall with a simmilar request (up to ignored headers)
-  case safeHead apiCalls of
-    -- if a request is found, respond with the saved response
-    Just c ->
-      if request c == savedRequest
-        then do
-          let
-            res = (response c)
-            gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (body (res :: SavedResponse))
-          writeIORef cassetteIORef $ cassette { apiCalls = tail apiCalls }
-          respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
-        else do
-          let msg = TE.encodeUtf8 . T.pack $ "Expected a different request: " <> show savedRequest
-          respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
-    -- if the request was not recorded, return an error
-    Nothing -> do
-      let msg = TE.encodeUtf8 . T.pack $
-                "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders
-      respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
+    Left msg -> do
+      let msg' = TE.encodeUtf8 msg
+      respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg' } [] (LBS.fromStrict $ msg' <> " YAML:" <> encode savedRequest)
 
 
 -- | Modify parts of the request so that it can be sent to the remote API while being received on a localhost server
@@ -202,3 +200,9 @@ needsCompression headers =
 safeHead :: [a] -> Maybe a
 safeHead []    = Nothing
 safeHead (x:_) = Just x
+
+note :: e -> Maybe a -> Either e a
+note err = maybe (Left err) Right
+
+tshow :: Show a => a -> Text
+tshow = T.pack . show
