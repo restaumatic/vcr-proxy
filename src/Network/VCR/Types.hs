@@ -37,6 +37,7 @@ parseMode =
       "Record"       -> Record endpoint
       "Replay"       -> Replay
       "ReplayStrict" -> ReplayStrict
+      m              -> error $ "Uknown mode: " <> m
   ) <$> strOption ( long "mode" <> short 'm' <> metavar "MODE" <> help "Run vcr proxy in the specified mode: Record | Replay | ReplayStrict")
     <*> strOption ( long "endpoint" <> short 'e' <> metavar "REMOTE_API_ENDPOINT" <> help "Forward requests to the specified API endpoint")
 
