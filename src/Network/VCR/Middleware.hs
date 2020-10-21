@@ -1,11 +1,13 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Network.VCR.Middleware where
 
+
 import           Control.Monad              (when)
 import           Data.ByteString.Builder    (toLazyByteString)
 import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import           Data.IORef                 (modifyIORef', newIORef, readIORef)
+import           Data.IORef                 (IORef, modifyIORef', newIORef,
+                                             readIORef, writeIORef)
 import           Data.List                  (find)
 import           Data.Maybe                 (mapMaybe)
 import           Data.Text                  (Text)
@@ -27,69 +29,64 @@ import qualified Data.Text.Encoding         as BE (encodeUtf8)
 import qualified Codec.Compression.GZip     as GZip
 import           Data.CaseInsensitive       (CI)
 import           Data.IORef                 (atomicModifyIORef)
-import           System.Directory           (doesFileExist)
 import qualified System.Exit                as XIO
 import           System.IO                  (stderr)
 import qualified System.IO                  (hPutStrLn)
 import qualified URI.ByteString             as URI
 
-middleware :: Mode -> FilePath -> Wai.Middleware
+middleware :: Mode -> IORef Cassette -> FilePath -> Wai.Middleware
 middleware Replay              = replayingMiddleware
 middleware Record { endpoint } = recordingMiddleware endpoint
 
 
 -- | Middleware which only records API calls, the requests are proxied to the `endpoint` and recorded in the
 -- `filePath` cassette file
-recordingMiddleware :: String -> FilePath -> Wai.Middleware
-recordingMiddleware endpoint filePath app req respond = do
-  exists <- doesFileExist filePath
-  when (not exists) $ encodeFile filePath (emptyCassette $ T.pack endpoint)
-  cas <- decodeFileEither filePath
+recordingMiddleware :: String -> IORef Cassette -> FilePath -> Wai.Middleware
+recordingMiddleware endpoint cassetteIORef filePath app req respond = do
+  cassette@Cassette { apiCalls, ignoredHeaders }<- readIORef cassetteIORef
   (req', body) <- getRequestBody req
   -- Construct a request that can be sent to the actual remote API, by replacing the host in the request with the endpoint
   -- passed as an argument to the middleware
   let newRequest = (modifyEndpoint (T.pack endpoint) req')
-  -- create file if it doesn't exist
-  case cas of
-    Left  err -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
-    Right cassette@Cassette { apiCalls, ignoredHeaders } ->
-      -- delegate to http-proxy app
-      app newRequest $ \response -> do
-        -- Save the request that we have received from the remote API
-        let savedRequest = buildRequest ignoredHeaders req' (LBS.fromChunks body)
-        -- Since reading the response body consumes it, we can't just reuse the response
-        (status, headers, reBody) <- getResponseBody response
-        savedResponse <- buildResponse reBody response
-        -- Store the request, response pair
-        encodeFile filePath $ cassette
-          { apiCalls = apiCalls <> [ApiCall { request = savedRequest, response = savedResponse }] }
-        respond $ Wai.responseLBS status headers (gzipIfNeeded headers reBody)
+  -- delegate to http-proxy app
+  app newRequest $ \response -> do
+    -- Save the request that we have received from the remote API
+    let savedRequest = buildRequest ignoredHeaders req' (LBS.fromChunks body)
+    -- Since reading the response body consumes it, we can't just reuse the response
+    (status, headers, reBody) <- getResponseBody response
+    savedResponse <- buildResponse reBody response
+    -- Store the request, response pair
+    encodeFile filePath $ cassette
+      { apiCalls = apiCalls <> [ApiCall { request = savedRequest, response = savedResponse }] }
+    respond $ Wai.responseLBS status headers (gzipIfNeeded headers reBody)
 
 
 -- | Middleware which only replays API calls, if a request is not found in the filePath provided cassette file,
 -- a 500 error will be thrown
-replayingMiddleware :: FilePath -> Wai.Middleware
-replayingMiddleware filePath app req respond = do
-  cas <- decodeFileEither filePath
-  case cas of
-    Left  err -> die $ "Cassette: " <> filePath <> " couldn't be decoded or found! " <> (show err)
-    Right cassette@Cassette { apiCalls, ignoredHeaders } -> do
-      b <- Wai.strictRequestBody req
-      let savedRequest = buildRequest ignoredHeaders req b
-      -- Find an existing ApiCall with a simmilar request (up to ignored headers)
-      case find (\c -> request c == savedRequest) apiCalls of
-        -- if a request is found, respond with the saved response
-        Just c ->
+replayingMiddleware :: IORef Cassette -> FilePath -> Wai.Middleware
+replayingMiddleware cassetteIORef filePath app req respond= do
+  cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
+  b <- Wai.strictRequestBody req
+  let savedRequest = buildRequest ignoredHeaders req b
+  -- Find an existing ApiCall with a simmilar request (up to ignored headers)
+  case safeHead apiCalls of
+    -- if a request is found, respond with the saved response
+    Just c ->
+      if request c == savedRequest
+        then do
           let
             res = (response c)
             gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (body (res :: SavedResponse))
-          in
-            respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
-        -- if the request was not recorded, return an error
-        Nothing -> do
-          let msg = TE.encodeUtf8 . T.pack $
-                    "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders
+          writeIORef cassetteIORef $ cassette { apiCalls = tail apiCalls }
+          respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
+        else do
+          let msg = TE.encodeUtf8 . T.pack $ "Expected a different request: " <> show savedRequest
           respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
+    -- if the request was not recorded, return an error
+    Nothing -> do
+      let msg = TE.encodeUtf8 . T.pack $
+                "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders
+      respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
 
 
 -- | Modify parts of the request so that it can be sent to the remote API while being received on a localhost server
@@ -179,3 +176,7 @@ needsCompression headers =
   case lookup ("Content-Encoding" :: CI BS.ByteString) headers of
     Just "gzip" -> True
     _           -> False
+
+safeHead :: [a] -> Maybe a
+safeHead []    = Nothing
+safeHead (x:_) = Just x
