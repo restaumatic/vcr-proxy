@@ -36,6 +36,7 @@ import qualified URI.ByteString             as URI
 
 middleware :: Mode -> IORef Cassette -> FilePath -> Wai.Middleware
 middleware Replay              = replayingMiddleware
+middleware ReplayStrict        = replayingStrictMiddleware
 middleware Record { endpoint } = recordingMiddleware endpoint
 
 
@@ -65,6 +66,27 @@ recordingMiddleware endpoint cassetteIORef filePath app req respond = do
 -- a 500 error will be thrown
 replayingMiddleware :: IORef Cassette -> FilePath -> Wai.Middleware
 replayingMiddleware cassetteIORef filePath app req respond= do
+  cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
+  b <- Wai.strictRequestBody req
+  let savedRequest = buildRequest ignoredHeaders req b
+  -- Find an existing ApiCall with a simmilar request (up to ignored headers)
+  case find (\c -> request c == savedRequest) apiCalls of
+    -- if a request is found, respond with the saved response
+    Just c -> do
+        let
+          res = (response c)
+          gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (body (res :: SavedResponse))
+        respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) (gzippedBody)
+    -- if the request was not recorded, return an error
+    Nothing -> do
+      let msg = TE.encodeUtf8 . T.pack $
+                "The request: " <> show savedRequest <> " is not recorded! Ignored headers: " <> show ignoredHeaders
+      respond $ Wai.responseLBS HT.status500 { HT.statusMessage = msg } [] (LBS.fromStrict $ msg <> " YAML:" <> encode savedRequest)
+
+
+-- | Requests must be matching and in order
+replayingStrictMiddleware :: IORef Cassette -> FilePath -> Wai.Middleware
+replayingStrictMiddleware cassetteIORef filePath app req respond= do
   cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
   b <- Wai.strictRequestBody req
   let savedRequest = buildRequest ignoredHeaders req b

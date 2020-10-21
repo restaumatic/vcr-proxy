@@ -1,8 +1,7 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric  #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE DeriveAnyClass  #-}
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE PatternSynonyms #-}
-
 module Network.VCR.Types where
 
 import qualified Data.ByteString         as B
@@ -27,16 +26,19 @@ import           Options.Applicative     (Parser, auto, help, long, metavar,
                                           value)
 
 
-data Mode = Record { endpoint :: String } | Replay
+data Mode = Record { endpoint :: String } | Replay | ReplayStrict
   deriving (Show, Eq)
 
-parseRecordMode :: Parser Mode
-parseRecordMode = Record <$> strOption ( long "record" <> short 'r' <> metavar "REMOTE_API_ENDPOINT" <>
-  help "Run in record mode, and forward requests to the specified API endpoint")
 
-parseReplayMode :: Parser Mode
-parseReplayMode = pure Replay
-
+parseMode :: Parser Mode
+parseMode =
+  (\mode endpoint ->
+    case mode of
+      "Record"       -> Record endpoint
+      "Replay"       -> Replay
+      "ReplayStrict" -> ReplayStrict
+  ) <$> strOption ( long "mode" <> short 'm' <> metavar "MODE" <> help "Run vcr proxy in the specified mode: Record | Replay | ReplayStrict")
+    <*> strOption ( long "endpoint" <> short 'e' <> metavar "REMOTE_API_ENDPOINT" <> help "Forward requests to the specified API endpoint")
 
 data Options = Options
   { cassettePath :: FilePath
@@ -50,7 +52,7 @@ pattern DEFAULT_PORT = 3128
 parseOptions :: Parser Options
 parseOptions = Options
   <$> strOption (long "cassette" <> short 'c' <> metavar "CASSETTE_FILE" <> help "Cassette yaml file for recording/replaying the API interactions")
-  <*> (parseRecordMode <|> parseReplayMode)
+  <*> parseMode
   <*> option auto (long "port" <> help "Port to listen on" <> showDefault <> value DEFAULT_PORT <> metavar "INT")
 
 
