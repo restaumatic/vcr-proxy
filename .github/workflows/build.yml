@@ -1,0 +1,33 @@
+name: CI
+
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: haskell/actions/setup@v1
+      with:
+        ghc-version: '8.6.3'
+        enable-stack: true
+        stack-version: 'latest'
+    - name: Cache
+      uses: actions/cache@v1
+      env:
+        cache-name: cache-stack
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/stack.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+    - name: Build dependencies
+      run: |
+        stack --no-terminal build --test --only-dependencies
+    - name: Build
+      run: |
+        mkdir dist
+        stack --no-terminal build --test --no-run-tests
+    - name: Test
+      run: stack --no-terminal build --test
