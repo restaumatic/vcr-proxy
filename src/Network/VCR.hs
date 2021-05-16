@@ -28,12 +28,12 @@ import qualified Network.Wai.Handler.Warp   as Warp
 import           Control.Applicative        ((<**>))
 import           Network.VCR.Middleware     (die, middleware)
 import           Network.VCR.Types          (Cassette, Mode (..), Options (..),
-                                             emptyCassette, parseOptions)
+                                             emptyCassette, parseOptions, readCassette)
 import           Options.Applicative        (execParser, fullDesc, header,
                                              helper, info, progDesc)
 import           System.Environment         (getArgs)
 
-import           Data.Yaml                  (decodeFileEither, encodeFile)
+import           Data.Yaml                  (encodeFile)
 import           System.Directory           (doesFileExist)
 import           System.IO                  (BufferMode (..), hSetBuffering,
                                              stdout)
@@ -55,7 +55,7 @@ run options@Options { mode, cassettePath, port } = do
       exists <- doesFileExist cassettePath
       when (not exists) $ encodeFile cassettePath (emptyCassette $ T.pack endpoint)
     _ -> pure ()
-  cas <- decodeFileEither cassettePath
+  cas <- readCassette cassettePath
   case cas of
     Left  err -> die $ "Cassette: " <> cassettePath <> " couldn't be decoded or found! " <> (show err)
     Right cassette -> do

@@ -1,18 +1,25 @@
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Network.VCR.Types where
 
 import qualified Data.ByteString         as B
 import qualified Data.ByteString.Lazy    as L
+import           Data.HashMap.Strict     (HashMap)
+import qualified Data.HashMap.Strict     as HashMap
+import           Data.Maybe              (fromJust)
 import           Data.Text               (Text)
 import qualified Data.Text.Encoding      as BE (decodeUtf8, encodeUtf8)
 import qualified Data.Text.Lazy.Encoding as BEL (decodeUtf8, encodeUtf8)
+import           Data.Yaml               (ParseException, decodeFileEither)
 
 
 import           Control.Monad           (mzero)
+import qualified Data.Aeson.Types        as JSON
 import           Data.Aeson              (FromJSON, ToJSON, Value (..), object,
+                                          decode, encode,
                                           parseJSON, toJSON, (.:), (.=))
 import           Data.CaseInsensitive    (foldedCase, mk)
 import           GHC.Generics            (Generic)
@@ -72,9 +79,10 @@ data ApiCall = ApiCall
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
 data Cassette = Cassette
-  { endpoint       :: Text
-  , apiCalls       :: [ApiCall]
-  , ignoredHeaders :: [Text]
+  { endpoint          :: Text
+  , apiCalls          :: [ApiCall]
+  , ignoredHeaders    :: [Text]
+  , ignoredBodyFields :: [Text]
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
 
@@ -140,5 +148,28 @@ toHeader (name, value)  =  (mk $ BE.encodeUtf8 name, BE.encodeUtf8 value)
 
 
 emptyCassette :: Text -> Cassette
-emptyCassette endpoint = Cassette { endpoint = endpoint, apiCalls = [], ignoredHeaders = [] }
+emptyCassette endpoint = Cassette { endpoint = endpoint, apiCalls = [], ignoredHeaders = [], ignoredBodyFields = [] }
 
+-- utility methods for matching with ignored fields in the body
+
+-- | Remove the ignored fields from the request's body
+modifyBody :: [Text] -> SavedRequest -> SavedRequest
+modifyBody ignoredBodyFields (SavedRequest mn hs url ps body) = SavedRequest mn hs url ps body'
+  where ignoredBodyFieldsMap = HashMap.fromList $ zip ignoredBodyFields (repeat Null)
+        bodyMap :: HashMap Text Value = HashMap.difference (fromJust . decode $ L.fromStrict body) ignoredBodyFieldsMap
+        body' = L.toStrict $ encode bodyMap
+
+-- | Remove the ignored fields from all of the saved requests
+--   this allows us to later match the requests without the ignored fields taken into account.
+modifyCassette :: Cassette -> Cassette
+modifyCassette (Cassette endpoint apiCalls ignoredHeaders ignoredBodyFields) =
+  (Cassette endpoint apiCalls' ignoredHeaders ignoredBodyFields)
+  where
+    modifyApiCall ignoredBodyFields (ApiCall savedRequest savedResponse) = ApiCall (modifyBody ignoredBodyFields savedRequest) savedResponse
+    apiCalls' = (modifyApiCall ignoredBodyFields) <$> apiCalls
+
+-- | Read the cassette, removing the ignored fields from all saved requests' bodies
+readCassette :: String -> IO (Either ParseException Cassette)
+readCassette filePath = do
+  cassette <- decodeFileEither filePath
+  pure (modifyCassette <$> cassette)

@@ -5,13 +5,14 @@ module Network.VCR.Middleware where
 
 
 import           Control.Monad              (when)
+import           Data.Aeson                 (decode, Value (..), Object)
 import           Data.ByteString.Builder    (toLazyByteString)
 import qualified Data.ByteString.Char8      as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.IORef                 (IORef, modifyIORef', newIORef,
                                              readIORef, writeIORef)
 import           Data.List                  (find)
-import           Data.Maybe                 (mapMaybe)
+import           Data.Maybe                 (fromJust, mapMaybe)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 
@@ -22,7 +23,7 @@ import           Data.Yaml                  (decodeFileEither, encode,
 import qualified Network.HTTP.Types         as HT
 import           Network.VCR.Types          (ApiCall (..), Cassette (..),
                                              Mode (..), SavedRequest (..),
-                                             SavedResponse (..), emptyCassette)
+                                             SavedResponse (..), emptyCassette, modifyBody)
 import qualified Network.Wai                as Wai
 
 import           Data.CaseInsensitive       (mk)
@@ -46,7 +47,7 @@ middleware Record { endpoint } = recordingMiddleware endpoint
 -- `filePath` cassette file
 recordingMiddleware :: String -> IORef Cassette -> FilePath -> Wai.Middleware
 recordingMiddleware endpoint cassetteIORef filePath app req respond = do
-  cassette@Cassette { apiCalls, ignoredHeaders }<- readIORef cassetteIORef
+  cassette@Cassette { apiCalls, ignoredHeaders, ignoredBodyFields }<- readIORef cassetteIORef
   (req', body) <- getRequestBody req
   -- Construct a request that can be sent to the actual remote API, by replacing the host in the request with the endpoint
   -- passed as an argument to the middleware
@@ -54,7 +55,7 @@ recordingMiddleware endpoint cassetteIORef filePath app req respond = do
   -- delegate to http-proxy app
   app newRequest $ \response -> do
     -- Save the request that we have received from the remote API
-    let savedRequest = buildRequest ignoredHeaders req' (LBS.fromChunks body)
+    let savedRequest = buildRequest ignoredHeaders ignoredBodyFields req' (LBS.fromChunks body)
     -- Since reading the response body consumes it, we can't just reuse the response
     (status, headers, reBody) <- getResponseBody response
     savedResponse <- buildResponse reBody response
@@ -75,10 +76,11 @@ findAnyResponse cassetteIORef savedRequest = do
     note ("The request: " <> tshow savedRequest <> " is not recorded! Ignored headers: " <> tshow ignoredHeaders) $
     find (\c -> request c == savedRequest) apiCalls
 
--- | A policy for obtaining response which expects the request to be issued in the order they were recorded.
+
+-- | A policy for obtaining r esponse which expects the request to be issued in the order they were recorded.
 consumeRequestsInOrder :: FindResponse
 consumeRequestsInOrder cassetteIORef savedRequest = do
-  cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
+  cassette@Cassette { apiCalls, ignoredHeaders, ignoredBodyFields } <- readIORef cassetteIORef
   case apiCalls of
     c : rest -> do
       if request c == savedRequest then do
@@ -86,6 +88,7 @@ consumeRequestsInOrder cassetteIORef savedRequest = do
         pure $ Right $ response c
       else
         pure $ Left $ "Expected a different request: " <> tshow savedRequest
+                   <> ", needed to match: " <> (tshow $ request c)
     [] ->
       pure $ Left "No more requests recorded!"
 
@@ -93,9 +96,9 @@ consumeRequestsInOrder cassetteIORef savedRequest = do
 -- a 500 error will be thrown
 replayingMiddleware :: FindResponse -> IORef Cassette -> FilePath -> Wai.Middleware
 replayingMiddleware findResponse cassetteIORef filePath app req respond = do
-  cassette@Cassette { apiCalls, ignoredHeaders } <- readIORef cassetteIORef
+  cassette@Cassette { apiCalls, ignoredHeaders, ignoredBodyFields } <- readIORef cassetteIORef
   b <- Wai.strictRequestBody req
-  let savedRequest = buildRequest ignoredHeaders req b
+  let savedRequest = buildRequest ignoredHeaders ignoredBodyFields req b
   -- Find an existing ApiCall according to the FindResponse policy
   findResponse cassetteIORef savedRequest >>= \case
     -- if a request is found, respond with the saved response
@@ -128,9 +131,9 @@ modifyEndpoint endpoint req = req
     endpointError e             = error $ "Error parsing endpoint as URI, " <> show e
     noHostError                 = error "No host could be extracted from the endpoint"
 
-buildRequest :: [Text] -> Wai.Request -> LBS.ByteString -> SavedRequest
-buildRequest ignoredHeaders r body =
-  SavedRequest
+buildRequest :: [Text] -> [Text] -> Wai.Request -> LBS.ByteString -> SavedRequest
+buildRequest ignoredHeaders ignoredBodyFields r body =
+  modifyBody ignoredBodyFields $ SavedRequest
     { methodName              = TE.decodeUtf8 $ Wai.requestMethod r
     , headers                 = reqHeaders
     , url                     = TE.decodeUtf8 $ Wai.rawPathInfo r
@@ -138,8 +141,8 @@ buildRequest ignoredHeaders r body =
     , body                    = LBS.toStrict body
     }
   where
-    reqHeaders                = filter (\(key, value) -> elem key ignoredHeaders')  (Wai.requestHeaders r)
-    ignoredHeaders'           = mk . BE.encodeUtf8 <$> ignoredHeaders
+    reqHeaders           = filter (\(key, value) -> elem key ignoredHeaders')  (Wai.requestHeaders r)
+    ignoredHeaders'      = mk . BE.encodeUtf8 <$> ignoredHeaders
 
 buildResponse :: LBS.ByteString -> Wai.Response -> IO SavedResponse
 buildResponse body response = do
