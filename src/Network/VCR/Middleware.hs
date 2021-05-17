@@ -12,7 +12,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.IORef                 (IORef, modifyIORef', newIORef,
                                              readIORef, writeIORef)
 import           Data.List                  (find)
-import           Data.Maybe                 (fromJust, mapMaybe)
+import           Data.Maybe                 (mapMaybe)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 
@@ -23,7 +23,7 @@ import           Data.Yaml                  (decodeFileEither, encode,
 import qualified Network.HTTP.Types         as HT
 import           Network.VCR.Types          (ApiCall (..), Cassette (..),
                                              Mode (..), SavedRequest (..),
-                                             SavedResponse (..), emptyCassette, modifyBody)
+                                             SavedResponse (..), emptyCassette, modifyBody')
 import qualified Network.Wai                as Wai
 
 import           Data.CaseInsensitive       (mk)
@@ -133,7 +133,7 @@ modifyEndpoint endpoint req = req
 
 buildRequest :: [Text] -> [Text] -> Wai.Request -> LBS.ByteString -> SavedRequest
 buildRequest ignoredHeaders ignoredBodyFields r body =
-  modifyBody ignoredBodyFields $ SavedRequest
+  modifyBody' ignoredBodyFields $ SavedRequest
     { methodName              = TE.decodeUtf8 $ Wai.requestMethod r
     , headers                 = reqHeaders
     , url                     = TE.decodeUtf8 $ Wai.rawPathInfo r
