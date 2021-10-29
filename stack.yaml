@@ -38,8 +38,8 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
-  - git: git@github.com:restaumatic/http-proxy.git
-    commit: 0b8a2e08d4d0d61c948fc664237a3f643128b062
+  - git: https://github.com/erikd/http-proxy.git
+    commit: 188f73a8dd9c994878de4f1c6429f2a6aec9d1b1
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

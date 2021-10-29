@@ -6,15 +6,15 @@
 packages:
 - completed:
     name: http-proxy
-    version: 0.1.1.0
-    git: git@github.com:restaumatic/http-proxy.git
+    version: 0.1.2.0
+    git: https://github.com/erikd/http-proxy.git
     pantry-tree:
       size: 1498
-      sha256: ae3728898bf4150f8feb2b8b6edf9fc16574fdd9f0646d18f0bd2238aa67140c
-    commit: 0b8a2e08d4d0d61c948fc664237a3f643128b062
+      sha256: 93869630e57ad90c1a2abbd27bf2990f48dca2dc6f26108cc96d2b1ec07f4aef
+    commit: 188f73a8dd9c994878de4f1c6429f2a6aec9d1b1
   original:
-    git: git@github.com:restaumatic/http-proxy.git
-    commit: 0b8a2e08d4d0d61c948fc664237a3f643128b062
+    git: https://github.com/erikd/http-proxy.git
+    commit: 188f73a8dd9c994878de4f1c6429f2a6aec9d1b1
 snapshots:
 - completed:
     size: 586041
