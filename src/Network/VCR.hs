@@ -48,7 +48,12 @@ server = execParser opts >>= run
      <> header "VCR Proxy" )
 
 run :: Options -> IO ()
-run options@Options { mode, cassettePath, port } = do
+run options = withServer options $ do
+  forever $ threadDelay 1000000000
+
+
+withServer :: Options -> IO a -> IO a
+withServer options@Options { mode, cassettePath, port } action = do
   putStrLn $ "Starting VCR proxy, mode: " <> show mode  <> ", cassette file: " <> cassettePath <>  ", listening on port: " <> show port
   case mode of
     Record endpoint -> do
@@ -60,12 +65,12 @@ run options@Options { mode, cassettePath, port } = do
     Left  err -> die $ "Cassette: " <> cassettePath <> " couldn't be decoded or found! " <> (show err)
     Right cassette -> do
       cassetteIORef <- newIORef cassette
-      withServer options cassetteIORef $ do
+      runInternal options cassetteIORef $ do
         putStrLn "VCR proxy started"
-        forever $ threadDelay 1000000000
+        action
 
-withServer :: Options -> IORef Cassette -> IO a -> IO a
-withServer Options { mode, cassettePath, port } cassetteIORef action = do
+runInternal :: Options -> IORef Cassette -> IO a -> IO a
+runInternal Options { mode, cassettePath, port } cassetteIORef action = do
   -- Set line buffering, because if we use it from a parent process, pipes are full buffered by default
   hSetBuffering stdout LineBuffering
   started <- newEmptyMVar
