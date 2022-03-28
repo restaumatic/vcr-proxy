@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-13.6
+resolver: lts-18.11
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -38,12 +38,8 @@ packages:
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
 extra-deps:
-  - conduit-1.2.13.1
-  - conduit-extra-1.2.3.2
-  - http-conduit-2.2.4
-  - http-proxy-0.1.0.5
-  - resourcet-1.1.11
-  - streaming-commons-0.1.19
+  - git: https://github.com/erikd/http-proxy.git
+    commit: 188f73a8dd9c994878de4f1c6429f2a6aec9d1b1
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
