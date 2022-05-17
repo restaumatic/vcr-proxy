@@ -31,6 +31,7 @@ dependencies:
 - http-types
 - bytestring
 - bytestring-builder
+- unordered-containers
 - text
 - directory
 - case-insensitive
