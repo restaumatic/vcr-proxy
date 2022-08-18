@@ -135,11 +135,11 @@ replayingMiddleware findResponse cassetteIORef filePath app req respond = do
       putTextStdErrLn $
         "\ESC[31mVCRProxy error: "
           <> msg
-          <> "\ESC[0mExpected request (only in strict replay mode): \n\ESC[34m"
+          <> "\n\ESC[0mExpected request (only in strict replay mode): \n\ESC[34m"
           <> jsonToText (A.toJSON savedRequest)
-          <> "\ESC[0mReceived request: \n"
+          <> "\n\ESC[0mReceived request: \n"
           <> jsonToText (A.toJSON receivedRequest)
-          <> "\ESC[33mDiff: \n"
+          <> "\n\ESC[33mDiff: \n"
           <> jsonToText (A.toJSON diff)
       respond $ Wai.responseLBS HT.status500 [] (A.encode response)
 
