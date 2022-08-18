@@ -37,6 +37,8 @@ dependencies:
 - warp
 - wai
 - aeson
+- aeson-pretty
+- aeson-diff
 - yaml
 - uri-bytestring
 - optparse-applicative

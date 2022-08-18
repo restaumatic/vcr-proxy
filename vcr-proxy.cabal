@@ -38,6 +38,8 @@ library
       NamedFieldPuns
   build-depends:
       aeson
+    , aeson-diff
+    , aeson-pretty
     , base >=4.7 && <5
     , bytestring
     , bytestring-builder
@@ -69,6 +71,8 @@ executable vcr-proxy
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
+    , aeson-diff
+    , aeson-pretty
     , base >=4.7 && <5
     , bytestring
     , bytestring-builder
@@ -102,6 +106,8 @@ test-suite vcr-proxy-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
+    , aeson-diff
+    , aeson-pretty
     , base >=4.7 && <5
     , bytestring
     , bytestring-builder
