@@ -4,6 +4,14 @@ VCR proxy can be used  to record and replay recorded API interactions.
 
 It is not a HTTP proxy in the normal sense, instead the HTTP client which we are testing should be pointed (if possible) at the proxy as its endpoint. VCR proxy in Record mode will use the "endpoint" argument to route the requests to the remote API.
 
+## Installation
+
+For restaumatic developers: VCR proxy is already present in our devcontainer. 
+
+For other users:
+* (Haskell users) build it with `stack install` (this will put the binary into $HOME/.local/bin which you might want to add to your path).
+* (Ubuntu users / possibly other distros) download a binary from: https://github.com/restaumatic/vcr-proxy/releases/tag/v0.3.0.0
+
 
 ## Usage
 
