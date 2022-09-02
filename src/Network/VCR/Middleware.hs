@@ -8,13 +8,13 @@ import Control.Monad (when)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.IORef (
-  IORef,
-  modifyIORef',
-  newIORef,
-  readIORef,
-  writeIORef,
- )
+import Data.IORef
+  ( IORef
+  , modifyIORef'
+  , newIORef
+  , readIORef
+  , writeIORef
+  )
 import Data.List (find)
 import Data.Maybe (mapMaybe)
 import Data.Text (Text)
@@ -22,25 +22,25 @@ import qualified Data.Text as T
 
 import qualified Data.Text.Encoding as TE
 
-import Data.Yaml (
-  decodeFileEither,
-  encode,
-  encodeFile,
- )
+import Data.Yaml
+  ( decodeFileEither
+  , encode
+  , encodeFile
+  )
 import qualified Network.HTTP.Types as HT
-import Network.VCR.Types (
-  ApiCall (..),
-  Body (..),
-  Cassette (..),
-  Mode (..),
-  ReplayError (..),
-  SavedRequest (..),
-  SavedResponse (..),
-  VCRResponse (..),
-  bodyToLBS,
-  emptyCassette,
-  lbsToBody,
- )
+import Network.VCR.Types
+  ( ApiCall (..)
+  , Body (..)
+  , Cassette (..)
+  , Mode (..)
+  , ReplayError (..)
+  , SavedRequest (..)
+  , SavedResponse (..)
+  , VCRResponse (..)
+  , bodyToLBS
+  , emptyCassette
+  , lbsToBody
+  )
 import qualified Network.Wai as Wai
 
 import qualified Data.Text.Encoding as BE (encodeUtf8)
@@ -154,7 +154,8 @@ modifyEndpoint endpoint req =
   where
     endpoint' = TE.encodeUtf8 endpoint
     uri = either endpointError id $ URI.parseURI URI.strictURIParserOptions endpoint'
-    host = maybe noHostError (URI.hostBS . URI.authorityHost) (URI.uriAuthority uri)
+    (host', port) = maybe noHostError (\a -> (URI.hostBS $ URI.authorityHost a, URI.portNumber <$> URI.authorityPort a)) (URI.uriAuthority uri)
+    host = host' <> maybe "" (\p -> TE.encodeUtf8 $ ":" <> tshow p) port
     scheme = URI.schemeBS . URI.uriScheme $ uri
     modifyHeader h@(key, value)
       | key == mk "host" = Just (key, host)
