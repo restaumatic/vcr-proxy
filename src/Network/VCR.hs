@@ -136,11 +136,11 @@ defaultExceptionResponse e =
 saveCassette :: ToJSON a => Bool -> FilePath -> a -> IO ()
 saveCassette compression path v =
     if compression
-    then encodeFile path v
-    else Compression.save 3 path v
+    then Compression.save 3 path v
+    else encodeFile path v
 
 loadCassette :: FromJSON a => Bool -> FilePath -> IO (Either ParseException a)
 loadCassette compression path =
     if compression
-    then decodeFileEither path
-    else Compression.load path
+    then Compression.load path
+    else decodeFileEither path
