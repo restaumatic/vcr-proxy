@@ -17,7 +17,7 @@ import Control.Exception (SomeException, bracket)
 import Control.Monad
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.IORef (IORef, newIORef)
+import Data.IORef (IORef, newIORef, readIORef)
 import qualified Data.Text as T
 import qualified Network.HTTP.Client as HC
 import qualified Network.HTTP.Conduit as HC
@@ -50,13 +50,14 @@ import Options.Applicative (
  )
 import System.Environment (getArgs)
 
-import Data.Yaml (decodeFileEither, encodeFile)
+import Data.Yaml (decodeFileEither, encodeFile, ToJSON, ParseException, FromJSON)
 import System.Directory (doesFileExist)
 import System.IO (
     BufferMode (..),
     hSetBuffering,
     stdout,
  )
+import qualified Network.VCR.Compression as Compression
 
 server :: IO ()
 server = execParser opts >>= run
@@ -74,14 +75,14 @@ run options = withServer options $ do
     forever $ threadDelay 1000000000
 
 withServer :: Options -> IO a -> IO a
-withServer options@Options{mode, cassettePath, port} action = do
+withServer options@Options{mode, cassettePath, port, compression} action = do
     putStrLn $ "Starting VCR proxy, mode: " <> show mode <> ", cassette file: " <> cassettePath <> ", listening on port: " <> show port
     case mode of
         Record endpoint -> do
             exists <- doesFileExist cassettePath
-            when (not exists) $ encodeFile cassettePath (emptyCassette $ T.pack endpoint)
+            when (not exists) $ saveCassette compression cassettePath (emptyCassette $ T.pack endpoint)
         _ -> pure ()
-    cas <- decodeFileEither cassettePath
+    cas <- loadCassette compression cassettePath
     case cas of
         Left err -> die $ "Cassette: " <> cassettePath <> " couldn't be decoded or found! " <> (show err)
         Right cassette -> do
@@ -91,17 +92,21 @@ withServer options@Options{mode, cassettePath, port} action = do
                 action
 
 runInternal :: Options -> IORef Cassette -> IO a -> IO a
-runInternal Options{mode, cassettePath, port} cassetteIORef action = do
+runInternal Options{mode, cassettePath, port, compression} cassetteIORef action = do
     -- Set line buffering, because if we use it from a parent process, pipes are full buffered by default
     hSetBuffering stdout LineBuffering
     started <- newEmptyMVar
-    bracket (start started) killThread $ \_ -> do
+    bracket (start started) (stop compression cassettePath cassetteIORef) $ \_ -> do
         takeMVar started
         action
   where
     start started = forkIO $ do
         mgr <- HC.newManager HC.tlsManagerSettings
-        Warp.runSettings (warpSettings started proxySettings) $ middleware mode cassetteIORef cassettePath $ HProxy.httpProxyApp proxySettings mgr
+        Warp.runSettings (warpSettings started proxySettings) $ middleware mode cassetteIORef $ HProxy.httpProxyApp proxySettings mgr
+    stop compression cassettePath casetteIORef threadId = do
+        cassette <- readIORef casetteIORef
+        saveCassette compression cassettePath cassette
+        killThread threadId
     proxySettings = HProxy.defaultProxySettings{HProxy.proxyPort = port}
 
 warpSettings ::
@@ -124,3 +129,15 @@ defaultExceptionResponse e =
         HT.badGateway502
         [(HT.hContentType, "text/plain; charset=utf-8")]
         $ LBS.fromChunks [BS.pack $ show e]
+
+saveCassette :: ToJSON a => Bool -> FilePath -> a -> IO ()
+saveCassette compression path v =
+    if compression
+    then encodeFile path v
+    else Compression.save 3 path v
+
+loadCassette :: FromJSON a => Bool -> FilePath -> IO (Either ParseException a)
+loadCassette compression path =
+    if compression
+    then decodeFileEither path
+    else Compression.load path

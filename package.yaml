@@ -43,6 +43,7 @@ dependencies:
 - uri-bytestring
 - optparse-applicative
 - zlib
+- zstd
 
 library:
   source-dirs: src

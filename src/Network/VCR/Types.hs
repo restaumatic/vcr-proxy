@@ -43,6 +43,7 @@ import Options.Applicative (
   short,
   showDefault,
   strOption,
+  switch,
   value,
  )
 
@@ -79,6 +80,7 @@ data Options = Options
   { cassettePath :: FilePath
   , mode :: Mode
   , port :: Int
+  , compression :: Bool
   }
   deriving (Eq, Show)
 
@@ -91,6 +93,7 @@ parseOptions =
     <$> strOption (long "cassette" <> short 'c' <> metavar "CASSETTE_FILE" <> help "Cassette yaml file for recording/replaying the API interactions")
     <*> parseMode
     <*> option auto (long "port" <> help "Port to listen on" <> showDefault <> value DEFAULT_PORT <> metavar "INT")
+    <*> switch (long "compression" <> help "Should cassette yaml be (de)compressed")
 
 data Body = JSONBody Value | RawBody B.ByteString
   deriving (Show, Eq)
