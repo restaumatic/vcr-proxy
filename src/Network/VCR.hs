@@ -104,8 +104,11 @@ runInternal Options{mode, cassettePath, port, compression} cassetteIORef action 
         mgr <- HC.newManager HC.tlsManagerSettings
         Warp.runSettings (warpSettings started proxySettings) $ middleware mode cassetteIORef $ HProxy.httpProxyApp proxySettings mgr
     stop compression cassettePath casetteIORef threadId = do
-        cassette <- readIORef casetteIORef
-        saveCassette compression cassettePath cassette
+        case mode of
+            Record _ -> do
+                cassette <- readIORef casetteIORef
+                saveCassette compression cassettePath cassette
+            _ -> pure ()
         killThread threadId
     proxySettings = HProxy.defaultProxySettings{HProxy.proxyPort = port}
 
