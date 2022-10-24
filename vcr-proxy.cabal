@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Network.VCR
+      Network.VCR.Compression
       Network.VCR.Middleware
       Network.VCR.Types
   other-modules:
@@ -56,6 +57,7 @@ library
     , warp
     , yaml
     , zlib
+    , zstd
   default-language: Haskell2010
 
 executable vcr-proxy
@@ -90,6 +92,7 @@ executable vcr-proxy
     , warp
     , yaml
     , zlib
+    , zstd
   default-language: Haskell2010
 
 test-suite vcr-proxy-test
@@ -125,4 +128,5 @@ test-suite vcr-proxy-test
     , warp
     , yaml
     , zlib
+    , zstd
   default-language: Haskell2010

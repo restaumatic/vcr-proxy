@@ -51,13 +51,13 @@ import qualified Data.Aeson.Diff as A
 import qualified Data.Aeson.Encode.Pretty as A
 
 import Data.CaseInsensitive (CI, mk)
-import Data.IORef (atomicModifyIORef)
+import Data.IORef (atomicModifyIORef')
 import qualified System.Exit as XIO
 import System.IO (stderr)
 import qualified System.IO (hPutStrLn)
 import qualified URI.ByteString as URI
 
-middleware :: Mode -> IORef Cassette -> FilePath -> Wai.Middleware
+middleware :: Mode -> IORef Cassette -> Wai.Middleware
 middleware Replay = replayingMiddleware findAnyResponse
 middleware ReplayStrict = replayingMiddleware consumeRequestsInOrder
 middleware Record {endpoint} = recordingMiddleware endpoint
@@ -65,9 +65,9 @@ middleware Record {endpoint} = recordingMiddleware endpoint
 {- | Middleware which only records API calls, the requests are proxied to the `endpoint` and recorded in the
  `filePath` cassette file
 -}
-recordingMiddleware :: String -> IORef Cassette -> FilePath -> Wai.Middleware
-recordingMiddleware endpoint cassetteIORef filePath app req respond = do
-  cassette@Cassette {apiCalls, ignoredHeaders} <- readIORef cassetteIORef
+recordingMiddleware :: String -> IORef Cassette -> Wai.Middleware
+recordingMiddleware endpoint cassetteIORef app req respond = do
+  Cassette {ignoredHeaders} <- readIORef cassetteIORef
   (req', body) <- getRequestBody req
   -- Construct a request that can be sent to the actual remote API, by replacing the host in the request with the endpoint
   -- passed as an argument to the middleware
@@ -80,10 +80,7 @@ recordingMiddleware endpoint cassetteIORef filePath app req respond = do
     (status, headers, reBody) <- getResponseBody response
     savedResponse <- buildResponse reBody response
     -- Store the request, response pair
-    encodeFile filePath $
-      cassette
-        { apiCalls = apiCalls <> [ApiCall {request = savedRequest, response = savedResponse}]
-        }
+    atomicModifyIORef' cassetteIORef $ \cassette -> (cassette { apiCalls = apiCalls cassette <> [ApiCall {request = savedRequest, response = savedResponse}] }, ())
     respond $ Wai.responseLBS status headers (gzipIfNeeded headers reBody)
 
 -- | A policy for obtaining responses given a request.
@@ -114,8 +111,8 @@ consumeRequestsInOrder cassetteIORef savedRequest = do
 {- | Middleware which only replays API calls, if a request is not found in the filePath provided cassette file,
  a 500 error will be thrown
 -}
-replayingMiddleware :: FindResponse -> IORef Cassette -> FilePath -> Wai.Middleware
-replayingMiddleware findResponse cassetteIORef filePath app req respond = do
+replayingMiddleware :: FindResponse -> IORef Cassette -> Wai.Middleware
+replayingMiddleware findResponse cassetteIORef app req respond = do
   cassette@Cassette {apiCalls, ignoredHeaders} <- readIORef cassetteIORef
   b <- Wai.strictRequestBody req
   let receivedRequest = buildRequest ignoredHeaders req b
@@ -209,7 +206,7 @@ getRequestBody req = do
   -- This implementation ensures that each chunk is only returned
   -- once.
   ichunks <- newIORef body
-  let rbody = atomicModifyIORef ichunks $ \chunks ->
+  let rbody = atomicModifyIORef' ichunks $ \chunks ->
         case chunks of
           [] -> ([], BS.empty)
           x : y -> (y, x)
