@@ -5,19 +5,19 @@
 
 packages:
 - completed:
+    commit: 3f711e0e3ab5826824804538712e17155a684172
+    git: https://github.com/restaumatic/http-proxy.git
     name: http-proxy
-    version: 0.1.2.0
-    git: https://github.com/erikd/http-proxy.git
     pantry-tree:
+      sha256: de2e4ce96959ab3243132b25e5371d5592f0224df36cf24f157e727acd5dda1f
       size: 1498
-      sha256: 93869630e57ad90c1a2abbd27bf2990f48dca2dc6f26108cc96d2b1ec07f4aef
-    commit: 188f73a8dd9c994878de4f1c6429f2a6aec9d1b1
+    version: 0.1.2.0
   original:
-    git: https://github.com/erikd/http-proxy.git
-    commit: 188f73a8dd9c994878de4f1c6429f2a6aec9d1b1
+    commit: 3f711e0e3ab5826824804538712e17155a684172
+    git: https://github.com/restaumatic/http-proxy.git
 snapshots:
 - completed:
-    size: 586041
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/11.yaml
-    sha256: ae30d25a4691c6bb32b5766c617dff24270b2b3576ebd6047d754418e9256389
-  original: lts-18.11
+    sha256: 2fdd7d3e54540062ef75ca0a73ca3a804c527dbf8a4cadafabf340e66ac4af40
+    size: 712469
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/11.yaml
+  original: lts-22.11

@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Network.VCR.Middleware where
 
@@ -120,8 +122,8 @@ replayingMiddleware findResponse cassetteIORef app req respond = do
   findResponse cassetteIORef receivedRequest >>= \case
     -- if a request is found, respond with the saved response
     Right res -> do
-      let gzippedBody = gzipIfNeeded (headers (res :: SavedResponse)) (bodyToLBS $ body (res :: SavedResponse))
-      respond $ Wai.responseLBS (status res) (headers (res :: SavedResponse)) gzippedBody
+      let gzippedBody = gzipIfNeeded res.headers (bodyToLBS res.body)
+      respond $ Wai.responseLBS (status res) res.headers gzippedBody
     -- if the request was not recorded, return an error
     Left err -> do
       let (msg, savedRequest) = case err of
