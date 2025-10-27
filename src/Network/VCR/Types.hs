@@ -109,10 +109,10 @@ bsToBody :: B.ByteString -> Body
 bsToBody body = maybe (RawBody body) JSONBody (decodeStrict body)
 
 instance FromJSON Body where
-  parseJSON v@(Object _) = pure $ JSONBody v
   parseJSON (String s) =
     -- Try extra hard to parse the body as JSON (for backwards compatibility with "stringified" JSON requests)
     pure $ bsToBody (BE.encodeUtf8 s)
+  parseJSON v = pure $ JSONBody v
 
 instance ToJSON Body where
   toJSON (JSONBody b) = b
