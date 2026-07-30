@@ -32,6 +32,7 @@ dependencies:
 - bytestring
 - bytestring-builder
 - text
+- unordered-containers
 - directory
 - case-insensitive
 - warp
@@ -69,3 +70,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - vcr-proxy
+    - time

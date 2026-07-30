@@ -7,6 +7,8 @@ module Network.VCR.Types where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import qualified Data.HashMap.Strict as HM
+import Data.HashMap.Strict (HashMap)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as BE (decodeUtf8, encodeUtf8)
 import qualified Data.Text.Lazy.Encoding as BEL (decodeUtf8, encodeUtf8)
@@ -206,3 +208,22 @@ toHeader (name, value) = (mk $ BE.encodeUtf8 name, BE.encodeUtf8 value)
 
 emptyCassette :: Text -> Cassette
 emptyCassette endpoint = Cassette {endpoint = endpoint, apiCalls = [], ignoredHeaders = []}
+
+-- | Canonical key derived from a 'SavedRequest' via its 'ToJSON' instance.
+-- Two requests that compare equal under '(==)' produce the same key, because the
+-- 'ToJSON' instance is total over every field used in '(==)' (method, lower-cased
+-- headers, url, params, body) and uses a fixed key ordering.
+requestKey :: SavedRequest -> B.ByteString
+requestKey = L.toStrict . encode . toJSON
+
+-- | Index built once at cassette load time. Maps a canonical request key to the
+-- first recorded 'ApiCall' with that key, matching 'find'\'s semantics in the
+-- former linear-scan replay lookup.
+type ReplayIndex = HashMap B.ByteString ApiCall
+
+buildReplayIndex :: [ApiCall] -> ReplayIndex
+buildReplayIndex calls =
+  -- 'HM.fromList' keeps the *last* occurrence on duplicate keys; reversing the
+  -- input list flips that to keep the *first*, preserving the previous
+  -- @find (\\c -> request c == r) apiCalls@ semantics.
+  HM.fromList [(requestKey (request c), c) | c <- reverse calls]

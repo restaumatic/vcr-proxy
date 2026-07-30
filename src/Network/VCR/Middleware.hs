@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -17,6 +18,7 @@ import Data.IORef
   , readIORef
   , writeIORef
   )
+import qualified Data.HashMap.Strict as HM
 import Data.List (find)
 import Data.Maybe (mapMaybe)
 import Data.Text (Text)
@@ -36,12 +38,15 @@ import Network.VCR.Types
   , Cassette (..)
   , Mode (..)
   , ReplayError (..)
+  , ReplayIndex
   , SavedRequest (..)
   , SavedResponse (..)
   , VCRResponse (..)
   , bodyToLBS
+  , buildReplayIndex
   , emptyCassette
   , lbsToBody
+  , requestKey
   )
 import qualified Network.Wai as Wai
 
@@ -59,10 +64,17 @@ import System.IO (stderr)
 import qualified System.IO (hPutStrLn)
 import qualified URI.ByteString as URI
 
-middleware :: Mode -> IORef Cassette -> Wai.Middleware
-middleware Replay = replayingMiddleware findAnyResponse
-middleware ReplayStrict = replayingMiddleware consumeRequestsInOrder
-middleware Record {endpoint} = recordingMiddleware endpoint
+middleware :: Mode -> IORef Cassette -> IO Wai.Middleware
+middleware Replay cassetteIORef = do
+  -- Build the request->ApiCall index once at startup. The non-strict Replay
+  -- mode never mutates the cassette, so the index is good for the whole run.
+  Cassette {apiCalls} <- readIORef cassetteIORef
+  let !idx = buildReplayIndex apiCalls
+  pure $ replayingMiddleware (findAnyResponse idx) cassetteIORef
+middleware ReplayStrict cassetteIORef =
+  pure $ replayingMiddleware consumeRequestsInOrder cassetteIORef
+middleware Record {endpoint} cassetteIORef =
+  pure $ recordingMiddleware endpoint cassetteIORef
 
 {- | Middleware which only records API calls, the requests are proxied to the `endpoint` and recorded in the
  `filePath` cassette file
@@ -88,13 +100,12 @@ recordingMiddleware endpoint cassetteIORef app req respond = do
 -- | A policy for obtaining responses given a request.
 type FindResponse = IORef Cassette -> SavedRequest -> IO (Either ReplayError SavedResponse)
 
-findAnyResponse :: FindResponse
-findAnyResponse cassetteIORef savedRequest = do
-  Cassette {apiCalls, ignoredHeaders} <- readIORef cassetteIORef
+findAnyResponse :: ReplayIndex -> FindResponse
+findAnyResponse idx _cassetteIORef savedRequest =
   pure $
     fmap response $
       note RequestNotRecorded $
-        find (\c -> request c == savedRequest) apiCalls
+        HM.lookup (requestKey savedRequest) idx
 
 -- | A policy for obtaining response which expects the request to be issued in the order they were recorded.
 consumeRequestsInOrder :: FindResponse

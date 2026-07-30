@@ -52,6 +52,7 @@ library
     , http-types
     , optparse-applicative
     , text
+    , unordered-containers
     , uri-bytestring
     , wai
     , warp
@@ -86,6 +87,7 @@ executable vcr-proxy
     , http-types
     , optparse-applicative
     , text
+    , unordered-containers
     , uri-bytestring
     , vcr-proxy
     , wai
@@ -122,6 +124,8 @@ test-suite vcr-proxy-test
     , http-types
     , optparse-applicative
     , text
+    , time
+    , unordered-containers
     , uri-bytestring
     , vcr-proxy
     , wai

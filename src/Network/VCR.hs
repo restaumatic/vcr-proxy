@@ -11,8 +11,9 @@ import Control.Concurrent.MVar (
     newEmptyMVar,
     putMVar,
     takeMVar,
+    tryPutMVar,
  )
-import Control.Exception (SomeException, bracket)
+import Control.Exception (SomeException, bracket, throwIO, try)
 
 import Control.Monad
 import qualified Data.ByteString.Char8 as BS
@@ -97,12 +98,17 @@ runInternal Options{mode, cassettePath, port, compression} cassetteIORef action 
     hSetBuffering stdout LineBuffering
     started <- newEmptyMVar
     bracket (start started) (stop compression cassettePath cassetteIORef) $ \_ -> do
-        takeMVar started
+        -- Re-throw if the server thread died before listening (e.g. the port was
+        -- already bound); otherwise the RTS reports the wait as a deadlock.
+        takeMVar started >>= either throwIO pure
         action
   where
     start started = forkIO $ do
-        mgr <- HC.newManager HC.tlsManagerSettings
-        Warp.runSettings (warpSettings started proxySettings) $ middleware mode cassetteIORef $ HProxy.httpProxyApp proxySettings mgr
+        result <- try $ do
+            mgr <- HC.newManager HC.tlsManagerSettings
+            mw <- middleware mode cassetteIORef
+            Warp.runSettings (warpSettings started proxySettings) $ mw $ HProxy.httpProxyApp proxySettings mgr
+        void $ tryPutMVar started (result :: Either SomeException ())
     stop compression cassettePath casetteIORef threadId = do
         case mode of
             Record _ -> do
@@ -113,8 +119,9 @@ runInternal Options{mode, cassettePath, port, compression} cassetteIORef action 
     proxySettings = HProxy.defaultProxySettings{HProxy.proxyPort = port}
 
 warpSettings ::
-    -- | MVar to put after starting
-    MVar () ->
+    -- | filled once the server is listening (Right), or by the caller with the
+    -- startup exception (Left) if it never got that far
+    MVar (Either SomeException ()) ->
     HProxy.Settings ->
     Warp.Settings
 warpSettings started pset =
@@ -123,7 +130,7 @@ warpSettings started pset =
         . Warp.setTimeout (HProxy.proxyTimeout pset)
         . Warp.setOnExceptionResponse defaultExceptionResponse
         -- This is needed so we know when we start using the proxy if it is run as a child process
-        . Warp.setBeforeMainLoop (putMVar started ())
+        . Warp.setBeforeMainLoop (putMVar started (Right ()))
         $ Warp.setNoParsePath True Warp.defaultSettings
 
 defaultExceptionResponse :: SomeException -> Wai.Response
